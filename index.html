@@ -1312,6 +1312,18 @@
       text-align: center;
     }
 
+    .swap-solid {
+      padding: 14px 2px 0;
+      color: var(--muted);
+      font-size: 11px;
+      text-align: center;
+    }
+
+    .swap-solid a {
+      color: var(--accent-2);
+      font-weight: 700;
+    }
+
     .token-modal {
       position: fixed;
       inset: 0;
@@ -3910,6 +3922,10 @@
           <div id="swapStatus" class="swap-status" aria-live="polite">Connect a wallet to trade.</div>
         </article>
 
+        <div class="swap-solid">
+          Need USDC? <a href="https://solid.xyz/" target="_blank" rel="noreferrer">Buy it on Solid ↗</a>
+        </div>
+
         <div class="swap-foot">
           Router: <a id="routerLink" href="https://explorer.fuse.io/address/0x6E055FfA786Dfe9DBB214b649a9b2A169e6B820b" target="_blank" rel="noreferrer">0x6E05…820b</a>
           · Quoter: <a id="quoterLink" href="https://explorer.fuse.io/address/0x87294CA0cF9a7E0226b91d84B2dEc89130Cac7cd" target="_blank" rel="noreferrer">0x8729…7cd</a>
@@ -4122,8 +4138,8 @@
       },
       USDC: {
         symbol: "USDC",
-        name: "Bridged USDC (Fuse)",
-        address: "0x28C3d1cD466Ba22f6cae51b1a4692a831696391A",
+        name: "Stargate Bridged USDC",
+        address: "0xc6Bc407706B7140EE8Eef2f86F9504651b63e7f9",
         decimals: 6,
         icon: "$",
         color: "#2775ca"
@@ -4159,6 +4175,14 @@
         decimals: 18,
         icon: "E",
         color: "#627eea"
+      },
+      SOUSD: {
+        symbol: "soUSD",
+        name: "New Token · Solid USD",
+        address: "0x75333830E7014e909535389a6E5b0C02aA62ca27",
+        decimals: 6,
+        icon: "S",
+        color: "#a3e635"
       }
     };
     const TOKEN_LIST = Object.values(TOKENS);
