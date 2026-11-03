@@ -2480,6 +2480,15 @@
       background-image: linear-gradient(155deg, rgba(124, 92, 255, 0.12), rgba(255, 255, 255, 0.01));
     }
 
+    .roadmap-card.pending {
+      border-color: rgba(94, 234, 212, 0.2);
+      background-image: linear-gradient(155deg, rgba(94, 234, 212, 0.07), rgba(255, 255, 255, 0.01));
+    }
+
+    .roadmap-card.pending .roadmap-top b {
+      color: var(--accent-2);
+    }
+
     .roadmap-card.next .roadmap-top b {
       color: var(--accent);
     }
@@ -3613,28 +3622,28 @@
             <div class="eyebrow">Roadmap</div>
             <h2>Built in public. Shipped on-chain.</h2>
           </div>
-          <span class="pill">Phase 04 · live</span>
+          <span class="pill">Phase 04 · In progress</span>
         </div>
         <div class="roadmap-grid">
           <article class="card roadmap-card done">
             <div class="roadmap-top"><span>Phase 01</span><b>LIVE</b></div>
-            <h3>Auto-rebalance Vault</h3>
-            <p>UUPS proxy, keeper-driven strategy rotation and a 0.05% performance fee.</p>
+            <h3>WFUSE Vault</h3>
+            <p>UUPS ERC-4626 vault live on Fuse Mainnet with keeper-driven strategy rotation.</p>
           </article>
           <article class="card roadmap-card done">
             <div class="roadmap-top"><span>Phase 02</span><b>LIVE</b></div>
-            <h3>Algebra Swap</h3>
-            <p>WFUSE, USDC, USDT, BERRY, sFUSE and WETH routed through Algebra Integral.</p>
+            <h3>BERRY Token</h3>
+            <p>20,000 BERRY fixed-supply governance token launched on Fuse.</p>
           </article>
-          <article class="card roadmap-card done">
-            <div class="roadmap-top"><span>Phase 03</span><b>LIVE</b></div>
-            <h3>Fuse Network Radar</h3>
-            <p>22 live metrics, TPS and gas histograms, transaction feed and public RPC reads.</p>
+          <article class="card roadmap-card pending">
+            <div class="roadmap-top"><span>Phase 03</span><b>IN PROGRESS</b></div>
+            <h3>Governance (Coming Soon)</h3>
+            <p>Snapshot integration planned.</p>
           </article>
-          <article class="card roadmap-card done">
-            <div class="roadmap-top"><span>Phase 04</span><b>LIVE</b></div>
-            <h3>BERRY Governance</h3>
-            <p>Signal proposals, vote with BERRY and shape the next strategy and fee decisions.</p>
+          <article class="card roadmap-card next">
+            <div class="roadmap-top"><span>Phase 04</span><b>Q1 2026</b></div>
+            <h3>USDC Vault</h3>
+            <p>Q1 2026: Launch of USDC Vault with dedicated Lending strategy.</p>
           </article>
         </div>
       </section>
