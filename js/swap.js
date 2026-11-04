@@ -23,6 +23,7 @@ import {
   onDataRefresh
 } from "./core.js";
 import { openWalletModal } from "./wallet.js";
+import { loadData } from "./vault.js";
 
     function parseSwapAmount() {
       const raw = els.fromAmount.value.trim().replace(",", ".");
