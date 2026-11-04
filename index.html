@@ -6322,24 +6322,24 @@
         return;
       }
 
-      // Keep the input parse as a guard, but approve the vault for unlimited
-      // WFUSE. This avoids any allowance rounding/mismatch between approve()
-      // and a later deposit() and also removes the need to approve every time.
+      // Approve the exact user amount plus a small buffer (1% + 1000 units),
+      // never an unlimited allowance. deposit() still sends only `amount`.
       const amount = parseAmount(els.depositInput);
       if (amount <= 0n) {
-        showToast("Invalid amount", "Enter a WFUSE amount first.", "error");
+        showToast("Invalid amount", `Enter a ${state.assetSymbol} amount first.`, "error");
         return;
       }
+      const approvalAmount = amount + (amount / 100n) + 1000n;
 
-      setBusy(true, "Confirm unlimited WFUSE approval in your wallet…");
+      setBusy(true, `Confirm ${state.assetSymbol} approval in your wallet…`);
       try {
-        const tx = await state.wfuseWrite.approve(CONFIG.vault, ethers.MaxUint256);
+        const tx = await state.wfuseWrite.approve(CONFIG.vault, approvalAmount);
         showToast("Approval sent", "Waiting for confirmation…", "info", tx.hash);
         const receipt = await tx.wait();
         if (receipt.status !== 1) throw new Error("Approval transaction reverted.");
         showToast(
           "Approval confirmed",
-          "Unlimited WFUSE approval confirmed. You can now deposit.",
+          `${state.assetSymbol} approval confirmed. You can now deposit.`,
           "success",
           tx.hash
         );
@@ -6359,11 +6359,11 @@
 
       const amount = parseAmount(els.depositInput);
       if (amount <= 0n) {
-        showToast("Invalid amount", "Enter a WFUSE amount first.", "error");
+        showToast("Invalid amount", `Enter a ${state.assetSymbol} amount first.`, "error");
         return;
       }
       if (state.allowance < amount) {
-        showToast("Approval required", "Approve WFUSE before depositing.", "error");
+        showToast("Approval required", `Approve ${state.assetSymbol} before depositing.`, "error");
         return;
       }
 
