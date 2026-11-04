@@ -14,7 +14,8 @@ import {
   ensurePublicProvider,
   onWalletConnected,
   emitDataRefresh,
-  sanitizeInput
+  sanitizeInput,
+  updateButtons
 } from "./core.js";
 import { updateNetworkBadge, openWalletModal } from "./wallet.js";
 
@@ -82,84 +83,6 @@ import { updateNetworkBadge, openWalletModal } from "./wallet.js";
         loadPublicStats();
       }
     }
-    function updateButtons() {
-      const depositAmount = parseAmount(els.depositInput);
-      const withdrawAmount = parseAmount(els.withdrawInput);
-
-      const hasAccount = Boolean(state.account);
-      const depositTooLarge = depositAmount > state.wfuseBalance;
-      const needsApproval =
-        depositAmount > 0n && state.allowance < depositAmount && !depositTooLarge;
-      const depositReady =
-        hasAccount &&
-        !state.busy &&
-        depositAmount > 0n &&
-        !depositTooLarge &&
-        !needsApproval;
-
-      els.approveBtn.hidden = !needsApproval;
-      els.approveBtn.disabled = state.busy;
-      els.depositBtn.disabled = !depositReady;
-      els.withdrawBtn.disabled =
-        !hasAccount ||
-        state.busy ||
-        withdrawAmount <= 0n ||
-        withdrawAmount > state.maxWithdraw;
-
-      els.depositMaxBtn.disabled = !hasAccount || state.wfuseBalance === 0n || state.busy;
-      els.withdrawMaxBtn.disabled = !hasAccount || state.maxWithdraw === 0n || state.busy;
-      els.connectBtn.disabled = state.connecting;
-
-      els.depositBalanceHint.textContent = hasAccount
-        ? `${formatToken(state.wfuseBalance)} ${state.assetSymbol} available`
-        : `— ${state.assetSymbol} available`;
-      els.withdrawBalanceHint.textContent = hasAccount
-        ? `${formatToken(state.maxWithdraw)} ${state.assetSymbol} available`
-        : `— ${state.assetSymbol} available`;
-
-      if (!hasAccount) {
-        els.depositHint.textContent = "Connect a wallet to continue.";
-        els.withdrawHint.textContent = "Connect a wallet to continue.";
-        els.depositAllowanceHint.textContent = "";
-        els.withdrawLimitHint.textContent = "";
-        return;
-      }
-
-      if (depositAmount <= 0n) {
-        els.depositHint.textContent = "Enter an amount to deposit.";
-        els.depositAllowanceHint.textContent = "";
-      } else if (depositTooLarge) {
-        els.depositHint.textContent = `Amount exceeds your ${state.assetSymbol} balance.`;
-        els.depositAllowanceHint.textContent = "";
-        els.depositHint.className = "warn";
-      } else if (needsApproval) {
-        els.depositHint.textContent = "Approval required before depositing.";
-        els.depositAllowanceHint.textContent = "Step 1 of 2";
-      } else {
-        els.depositHint.textContent = "Ready to deposit.";
-        els.depositAllowanceHint.textContent = "Approved";
-      }
-      if (!depositTooLarge && !needsApproval && depositAmount > 0n) {
-        els.depositHint.className = "ok";
-      } else {
-        els.depositHint.className = depositTooLarge ? "warn" : "";
-      }
-
-      if (withdrawAmount <= 0n) {
-        els.withdrawHint.textContent = "Enter an amount to withdraw.";
-        els.withdrawLimitHint.textContent = "";
-        els.withdrawHint.className = "";
-      } else if (withdrawAmount > state.maxWithdraw) {
-        els.withdrawHint.textContent = "Amount exceeds your withdrawable balance.";
-        els.withdrawLimitHint.textContent = "Includes strategy liquidity";
-        els.withdrawHint.className = "warn";
-      } else {
-        els.withdrawHint.textContent = "Ready to withdraw.";
-        els.withdrawLimitHint.textContent = "";
-        els.withdrawHint.className = "ok";
-      }
-    }
-
     function updateYourShare() {
       if (!state.account || state.totalSupply === 0n) {
         els.yourShareNote.textContent = "Vault shares";
