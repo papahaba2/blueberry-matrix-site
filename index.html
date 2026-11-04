@@ -1913,6 +1913,50 @@
       opacity: 1;
     }
 
+    /* ------------------------------ Vault switcher -------------------------- */
+
+    .vault-switch {
+      display: inline-flex;
+      gap: 4px;
+      margin: 4px 0 20px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    .vault-switch-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 13px;
+      border: 0;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 600;
+      transition: color 180ms ease, background 180ms ease;
+    }
+
+    .vault-switch-btn:hover {
+      color: var(--text);
+    }
+
+    .vault-switch-btn.active {
+      background: rgba(94, 234, 212, 0.1);
+      color: var(--accent-2);
+    }
+
+    .vault-switch-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 8px currentColor;
+    }
+
     /* ------------------------------ Vault hero ------------------------------ */
 
     .vault-overview {
@@ -3656,11 +3700,20 @@
 
     <div id="appView" class="page app-page" hidden>
       <section id="vaultView" class="view active" role="tabpanel" aria-label="Vault">
+      <div class="vault-switch" role="tablist" aria-label="Choose vault">
+        <button class="vault-switch-btn active" type="button" role="tab" aria-selected="true" data-vault="WFUSE">
+          <span class="vault-switch-dot"></span>WFUSE Vault
+        </button>
+        <button class="vault-switch-btn" type="button" role="tab" aria-selected="false" data-vault="USDC">
+          <span class="vault-switch-dot"></span>USDC Vault
+        </button>
+      </div>
+
       <section class="hero">
       <div class="eyebrow">Automated yield vault</div>
-      <h1>Put your <span class="gradient-text">WFUSE</span> to work.</h1>
+      <h1>Put your <span id="vaultHeadingAsset" class="gradient-text">WFUSE</span> to work.</h1>
       <p>
-        Deposit WFUSE, receive frVLT shares, and let the keeper rotate capital between
+        Deposit into the selected vault, receive shares, and let the keeper rotate capital between
         approved Fuse strategies. Non-custodial, on-chain, and fully transparent.
       </p>
       <div class="local-note">Local-first: public RPC reads, wallet-signed writes. No backend or VDS required.</div>
@@ -3678,7 +3731,7 @@
       <article class="card vault-position-card">
         <div class="network-stat-label">Your position</div>
         <div id="vaultHeroShares" class="vault-position-value">—</div>
-        <div class="vault-position-note">frVLT shares</div>
+        <div id="vaultPositionNote" class="vault-position-note">frVLT shares</div>
         <div class="vault-position-line">
           <span>Share price</span>
           <b id="vaultHeroSharePrice">—</b>
@@ -3688,13 +3741,13 @@
 
     <section class="stats" aria-label="Vault statistics">
       <article class="card stat">
-        <div class="stat-label">Your WFUSE</div>
+        <div id="vaultAssetLabel" class="stat-label">Your WFUSE</div>
         <div id="wfuseBalance" class="stat-value">—</div>
         <div class="stat-note">Wallet balance</div>
       </article>
 
       <article class="card stat">
-        <div class="stat-label">Your frVLT</div>
+        <div id="vaultShareLabel" class="stat-label">Your frVLT</div>
         <div id="sharesBalance" class="stat-value">—</div>
         <div id="yourShareNote" class="stat-note">Vault shares</div>
       </article>
@@ -3714,13 +3767,13 @@
       <article class="card stat">
         <div class="stat-label">Share Price</div>
         <div id="sharePrice" class="stat-value">—</div>
-        <div class="stat-note">WFUSE per frVLT</div>
+        <div id="sharePriceNote" class="stat-note">WFUSE per frVLT</div>
       </article>
 
       <article class="card stat">
         <div class="stat-label">Total Shares</div>
         <div id="totalShares" class="stat-value">—</div>
-        <div class="stat-note">frVLT total supply</div>
+        <div id="totalSharesNote" class="stat-note">frVLT total supply</div>
       </article>
 
       <article class="card stat">
@@ -3735,9 +3788,9 @@
         <div class="panel-head">
           <div>
             <h2 class="panel-title">Deposit</h2>
-            <div class="panel-sub">Approve WFUSE, then mint frVLT shares.</div>
+            <div id="depositSub" class="panel-sub">Approve WFUSE, then mint frVLT shares.</div>
           </div>
-          <span class="pill">WFUSE</span>
+          <span id="depositPill" class="pill">WFUSE</span>
         </div>
 
         <label class="field" for="depositInput">
@@ -3757,7 +3810,7 @@
               aria-label="WFUSE amount to deposit"
             />
             <button id="depositMaxBtn" class="max-btn" type="button" disabled>MAX</button>
-            <span class="token-tag"><span class="token-icon">W</span>WFUSE</span>
+            <span class="token-tag"><span id="depositTokenIcon" class="token-icon">W</span><span id="depositTokenText">WFUSE</span></span>
           </div>
         </label>
 
@@ -3776,9 +3829,9 @@
         <div class="panel-head">
           <div>
             <h2 class="panel-title">Withdraw</h2>
-            <div class="panel-sub">Redeem frVLT shares and receive WFUSE.</div>
+            <div id="withdrawSub" class="panel-sub">Redeem frVLT shares and receive WFUSE.</div>
           </div>
-          <span class="pill">frVLT</span>
+          <span id="withdrawPill" class="pill">frVLT</span>
         </div>
 
         <label class="field" for="withdrawInput">
@@ -3798,7 +3851,7 @@
               aria-label="WFUSE amount to withdraw"
             />
             <button id="withdrawMaxBtn" class="max-btn" type="button" disabled>MAX</button>
-            <span class="token-tag"><span class="token-icon">W</span>WFUSE</span>
+            <span class="token-tag"><span id="withdrawTokenIcon" class="token-icon">W</span><span id="withdrawTokenText">WFUSE</span></span>
           </div>
         </label>
 
@@ -4121,6 +4174,29 @@
       berry: "0x5Dc3fc8B4C0Fcb33F7af13F14920172FEf288069"
     };
 
+    const VAULTS = {
+      WFUSE: {
+        key: "WFUSE",
+        label: "WFUSE Vault",
+        address: "0xf1227c2419f3535d918B0174b7Df5AbC602d718e",
+        asset: "0x0BE9e53fd7EDaC9F859882AfdDa116645287C629",
+        symbol: "WFUSE",
+        shareSymbol: "frVLT",
+        decimals: 18,
+        icon: "W"
+      },
+      USDC: {
+        key: "USDC",
+        label: "USDC Vault",
+        address: "0x53968BA736439d7838E88e0F7BCb47A4d9C6955a",
+        asset: "0xc6Bc407706B7140EE8Eef2f86F9504651b63e7f9",
+        symbol: "USDC",
+        shareSymbol: "bbUSDC",
+        decimals: 6,
+        icon: "$"
+      }
+    };
+
     const FUSE_CHAIN = {
       chainId: CONFIG.chainIdHex,
       chainName: CONFIG.chainName,
@@ -4271,6 +4347,9 @@
       shares: null,
       publicProvider: null,
       publicVault: null,
+      activeVault: "WFUSE",
+      assetSymbol: "WFUSE",
+      shareSymbol: "frVLT",
       decimals: 18,
       wfuseBalance: 0n,
       sharesBalance: 0n,
@@ -4310,6 +4389,21 @@
       networkText: document.getElementById("networkText"),
       wfuseBalance: document.getElementById("wfuseBalance"),
       sharesBalance: document.getElementById("sharesBalance"),
+      vaultAssetLabel: document.getElementById("vaultAssetLabel"),
+      vaultShareLabel: document.getElementById("vaultShareLabel"),
+      vaultHeadingAsset: document.getElementById("vaultHeadingAsset"),
+      vaultPositionNote: document.getElementById("vaultPositionNote"),
+      sharePriceNote: document.getElementById("sharePriceNote"),
+      totalSharesNote: document.getElementById("totalSharesNote"),
+      depositSub: document.getElementById("depositSub"),
+      depositPill: document.getElementById("depositPill"),
+      depositTokenIcon: document.getElementById("depositTokenIcon"),
+      depositTokenText: document.getElementById("depositTokenText"),
+      withdrawSub: document.getElementById("withdrawSub"),
+      withdrawPill: document.getElementById("withdrawPill"),
+      withdrawTokenIcon: document.getElementById("withdrawTokenIcon"),
+      withdrawTokenText: document.getElementById("withdrawTokenText"),
+      vaultSwitchButtons: Array.from(document.querySelectorAll(".vault-switch-btn")),
       yourShareNote: document.getElementById("yourShareNote"),
       vaultTvl: document.getElementById("vaultTvl"),
       vaultHeroTvl: document.getElementById("vaultHeroTvl"),
@@ -4448,6 +4542,71 @@
       const [whole, fraction = ""] = raw.split(".");
       const padded = `${fraction}00000000`.slice(0, 8);
       return `${withGrouping(whole)}.${padded}`;
+    }
+
+    function setVaultLabels() {
+      const meta = VAULTS[state.activeVault];
+      state.assetSymbol = meta.symbol;
+      state.shareSymbol = meta.shareSymbol;
+      state.decimals = meta.decimals;
+
+      els.vaultAssetLabel.textContent = `Your ${meta.symbol}`;
+      els.vaultShareLabel.textContent = `Your ${meta.shareSymbol}`;
+      els.vaultHeadingAsset.textContent = meta.symbol;
+      els.vaultPositionNote.textContent = `${meta.shareSymbol} shares`;
+      els.sharePriceNote.textContent = `${meta.symbol} per ${meta.shareSymbol}`;
+      els.totalSharesNote.textContent = `${meta.shareSymbol} total supply`;
+      els.depositSub.textContent = `Approve ${meta.symbol}, then mint ${meta.shareSymbol} shares.`;
+      els.depositPill.textContent = meta.symbol;
+      els.depositTokenIcon.textContent = meta.icon;
+      els.depositTokenText.textContent = meta.symbol;
+      els.withdrawSub.textContent = `Redeem ${meta.shareSymbol} shares and receive ${meta.symbol}.`;
+      els.withdrawPill.textContent = meta.shareSymbol;
+      els.withdrawTokenIcon.textContent = meta.icon;
+      els.withdrawTokenText.textContent = meta.symbol;
+      els.depositInput.setAttribute("aria-label", `${meta.symbol} amount to deposit`);
+      els.withdrawInput.setAttribute("aria-label", `${meta.symbol} amount to withdraw`);
+
+      for (const button of els.vaultSwitchButtons) {
+        const active = button.dataset.vault === state.activeVault;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", active ? "true" : "false");
+      }
+    }
+
+    function resetVaultContracts() {
+      state.vault = null;
+      state.vaultWrite = null;
+      state.wfuse = null;
+      state.wfuseWrite = null;
+      state.shares = null;
+      state.publicVault = null;
+      state.allowance = 0n;
+    }
+
+    function switchVault(key) {
+      if (!VAULTS[key] || state.activeVault === key) return;
+      state.activeVault = key;
+      const meta = VAULTS[key];
+      CONFIG.vault = meta.address;
+      CONFIG.wfuse = meta.asset;
+      state.decimals = meta.decimals;
+      setVaultLabels();
+      resetVaultContracts();
+      resetReadState();
+
+      if (state.account && state.provider && state.signer) {
+        state.vault = new ethers.Contract(CONFIG.vault, VAULT_ABI, state.provider);
+        state.vaultWrite = new ethers.Contract(CONFIG.vault, VAULT_ABI, state.signer);
+        state.wfuse = new ethers.Contract(CONFIG.wfuse, ERC20_ABI, state.provider);
+        state.wfuseWrite = new ethers.Contract(CONFIG.wfuse, ERC20_ABI, state.signer);
+        state.shares = new ethers.Contract(CONFIG.vault, ERC20_ABI, state.provider);
+        setSyncStatus(`Switched to ${meta.label}`, "loading");
+        loadData();
+      } else {
+        setSyncStatus(`Loading ${meta.label}…`, "loading");
+        loadPublicStats();
+      }
     }
 
     function parseAmount(input) {
@@ -5836,11 +5995,11 @@
       els.connectBtn.disabled = state.connecting;
 
       els.depositBalanceHint.textContent = hasAccount
-        ? `${formatToken(state.wfuseBalance)} WFUSE available`
-        : "— WFUSE available";
+        ? `${formatToken(state.wfuseBalance)} ${state.assetSymbol} available`
+        : `— ${state.assetSymbol} available`;
       els.withdrawBalanceHint.textContent = hasAccount
-        ? `${formatToken(state.maxWithdraw)} WFUSE available`
-        : "— WFUSE available";
+        ? `${formatToken(state.maxWithdraw)} ${state.assetSymbol} available`
+        : `— ${state.assetSymbol} available`;
 
       if (!hasAccount) {
         els.depositHint.textContent = "Connect a wallet to continue.";
@@ -5854,7 +6013,7 @@
         els.depositHint.textContent = "Enter an amount to deposit.";
         els.depositAllowanceHint.textContent = "";
       } else if (depositTooLarge) {
-        els.depositHint.textContent = "Amount exceeds your WFUSE balance.";
+        els.depositHint.textContent = `Amount exceeds your ${state.assetSymbol} balance.`;
         els.depositAllowanceHint.textContent = "";
         els.depositHint.className = "warn";
       } else if (needsApproval) {
@@ -5894,7 +6053,7 @@
       const pct =
         Number((state.sharesBalance * 1_000_000n) / state.totalSupply) / 10_000;
       els.yourShareNote.textContent = `Vault shares · ${pct.toFixed(2)}% of supply`;
-      els.vaultHeroShares.innerHTML = `${formatToken(state.sharesBalance)} <span class="unit">frVLT</span>`;
+      els.vaultHeroShares.innerHTML = `${formatToken(state.sharesBalance)} <span class="unit">${state.shareSymbol}</span>`;
     }
 
     function renderStrategy(strategy) {
@@ -5916,18 +6075,19 @@
     }
 
     async function readVaultStats(vaultContract, readProvider) {
-      const [totalAssets, currentStrategy, maxSlippage, totalSupply] =
+      const [totalAssets, currentStrategy, maxSlippage, totalSupply, shareDecimals] =
         await Promise.all([
           vaultContract.totalAssets(),
           vaultContract.currentStrategy(),
           vaultContract.maxSlippageBps(),
-          vaultContract.totalSupply()
+          vaultContract.totalSupply(),
+          vaultContract.decimals()
         ]);
 
       let sharePrice = 0n;
       if (totalSupply > 0n) {
         try {
-          sharePrice = await vaultContract.convertToAssets(10n ** 18n);
+          sharePrice = await vaultContract.convertToAssets(10n ** BigInt(shareDecimals));
         } catch {
           sharePrice = 0n;
         }
@@ -5962,21 +6122,23 @@
       state.sharePrice = stats.sharePrice;
       state.strategyAprBps = stats.strategyAprBps;
 
-      els.vaultTvl.innerHTML = `${formatToken(stats.totalAssets)} <span class="unit">WFUSE</span>`;
-      const landingTvlHtml = `${formatToken(stats.totalAssets)} <span class="unit">WFUSE</span>`;
+      const assetSymbol = state.assetSymbol;
+      const shareSymbol = state.shareSymbol;
+      els.vaultTvl.innerHTML = `${formatToken(stats.totalAssets)} <span class="unit">${assetSymbol}</span>`;
+      const landingTvlHtml = `${formatToken(stats.totalAssets)} <span class="unit">${assetSymbol}</span>`;
       els.landingTvl.innerHTML = landingTvlHtml;
       els.landingTerminalTvl.innerHTML = landingTvlHtml;
       els.vaultHeroTvl.innerHTML = landingTvlHtml;
-      els.totalShares.innerHTML = `${formatToken(stats.totalSupply)} <span class="unit">frVLT</span>`;
+      els.totalShares.innerHTML = `${formatToken(stats.totalSupply)} <span class="unit">${shareSymbol}</span>`;
       const sharePriceHtml =
         stats.totalSupply > 0n
-          ? `${formatSharePrice(stats.sharePrice)} <span class="unit">WFUSE</span>`
+          ? `${formatSharePrice(stats.sharePrice)} <span class="unit">${assetSymbol}</span>`
           : "—";
       els.sharePrice.innerHTML = sharePriceHtml;
       els.vaultHeroSharePrice.innerHTML = sharePriceHtml;
       els.sharePrice.title =
         stats.totalSupply > 0n
-          ? `${ethers.formatUnits(stats.sharePrice, state.decimals)} WFUSE per frVLT`
+          ? `${ethers.formatUnits(stats.sharePrice, state.decimals)} ${assetSymbol} per ${shareSymbol}`
           : "";
 
       els.maxSlippage.textContent = `${stats.maxSlippage.toString()} bps`;
@@ -6091,8 +6253,8 @@
 
         state.maxWithdraw = maxWithdraw;
 
-        els.wfuseBalance.innerHTML = `${formatToken(wfuseBalance)} <span class="unit">WFUSE</span>`;
-        els.sharesBalance.innerHTML = `${formatToken(sharesBalance)} <span class="unit">frVLT</span>`;
+        els.wfuseBalance.innerHTML = `${formatToken(wfuseBalance)} <span class="unit">${state.assetSymbol}</span>`;
+        els.sharesBalance.innerHTML = `${formatToken(sharesBalance)} <span class="unit">${state.shareSymbol}</span>`;
 
         updateStats(stats);
         setSyncStatus("Live · ready");
@@ -6253,6 +6415,10 @@
       }
     }
 
+    for (const button of els.vaultSwitchButtons) {
+      button.addEventListener("click", () => switchVault(button.dataset.vault));
+    }
+
     els.connectBtn.addEventListener("click", () => openWalletModal());
     els.themeBtn.addEventListener("click", toggleTheme);
     els.approveBtn.addEventListener("click", approve);
@@ -6285,6 +6451,7 @@
     initGovernance();
     initPage();
     initReveal();
+    setVaultLabels();
     resetReadState();
     updateNetworkBadge("disconnected");
     setSyncStatus("Loading public vault data…", "loading");
