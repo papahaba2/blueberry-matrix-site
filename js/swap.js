@@ -333,7 +333,7 @@ import { openWalletModal } from "./wallet.js";
         disabled = true;
         status = "Confirm the transaction in your wallet.";
       } else if (amount <= 0n) {
-        label = "Enter an amount";
+        label = "Swap";
         disabled = true;
         status = "Enter an amount to get a quote.";
       } else if (amount > state.swapFromBalance) {
