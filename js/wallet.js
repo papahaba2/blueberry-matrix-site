@@ -175,6 +175,17 @@ async function connectWallet(selectedProvider = null) {
     updateNetworkBadge("connected");
     showToast("Wallet connected", `Connected as ${shortAddress(state.account)}.`, "success");
 
+    // Cross-module browser event. Modules that do not participate in the
+    // internal EventTarget bus (Swap is the main one) listen to this directly.
+    window.dispatchEvent(
+      new CustomEvent("walletConnected", {
+        detail: {
+          account: state.account,
+          signer: state.signer,
+          provider: state.provider
+        }
+      })
+    );
     emitWalletConnected(state.account);
   } catch (error) {
     console.error(error);

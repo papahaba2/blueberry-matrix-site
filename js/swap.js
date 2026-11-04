@@ -18,6 +18,7 @@ import {
   setBusy,
   friendlyError,
   formatToken,
+  formatAmount,
   ensurePublicProvider,
   onDataRefresh
 } from "./core.js";
@@ -473,6 +474,21 @@ export function initSwap() {
     await refreshSwapBalances();
     updateSwapUI();
   });
+
+  // Direct bridge from wallet.js. This is deliberately a browser event so the
+  // Swap module still updates even if the Vault module's RPC read fails.
+  window.addEventListener("walletConnected", (event) => {
+    const { account, signer, provider } = event.detail || {};
+    if (account) state.account = account;
+    if (signer) state.signer = signer;
+    if (provider) state.provider = provider;
+    refreshSwapBalances();
+    updateSwapUI();
+  });
+
+  if (state.account) {
+    refreshSwapBalances();
+  }
 
   updateSwapUI();
 }

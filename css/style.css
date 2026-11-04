@@ -3463,7 +3463,7 @@
       }
 
       .home-btn::before {
-        content: "←";
+        content: "в†ђ";
         font-size: 16px;
       }
 
@@ -3489,3 +3489,267 @@
         gap: 8px;
       }
     }
+
+/* -------------------------------------------------------------------------- */
+/* Swap polish вЂ” compact Jupiter/Uniswap-like sizing                          */
+/* -------------------------------------------------------------------------- */
+
+.swap-shell {
+  width: min(480px, 100%);
+}
+
+.swap-heading {
+  padding: 2px 0 18px;
+}
+
+.swap-heading h2 {
+  font-size: clamp(28px, 3.4vw, 36px);
+}
+
+.swap-heading p {
+  max-width: 390px;
+  margin-top: 9px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.swap-card {
+  padding: 16px;
+  border-radius: 20px;
+}
+
+.swap-card-head {
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.swap-card-head h3 {
+  font-size: 17px;
+}
+
+.swap-card-head p {
+  margin-top: 2px;
+  font-size: 10px;
+}
+
+.swap-card-head .pill {
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 9px;
+}
+
+.swap-box {
+  padding: 10px 12px;
+  border-radius: 14px;
+}
+
+.swap-box-top,
+.swap-box-bottom {
+  min-height: 16px;
+  font-size: 10px;
+}
+
+.swap-box-main {
+  gap: 8px;
+  margin: 4px 0 5px;
+}
+
+.swap-input {
+  height: 34px;
+  font-size: 25px;
+  line-height: 1.1;
+}
+
+.token-select {
+  min-height: 36px;
+  gap: 6px;
+  padding: 0 9px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+.token-select .token-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.chevron {
+  width: 12px;
+  height: 12px;
+}
+
+.swap-box-bottom {
+  gap: 8px;
+}
+
+.swap-box-bottom .max-btn {
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 9px;
+}
+
+#fromBalanceHint,
+#toBalanceHint {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  font-size: 10px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.switch-btn {
+  width: 32px;
+  height: 32px;
+  margin: -6px auto;
+}
+
+.switch-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.swap-rate {
+  min-height: 30px;
+  padding: 4px 2px;
+  font-size: 10px;
+}
+
+#swapRoute {
+  font-size: 9px;
+}
+
+.swap-summary {
+  gap: 5px;
+  padding: 0 2px 8px;
+}
+
+.swap-summary-row {
+  font-size: 10px;
+}
+
+.swap-btn {
+  min-height: 46px;
+  border-radius: 13px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.swap-status {
+  min-height: 14px;
+  margin-top: 6px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.swap-solid {
+  padding-top: 10px;
+  font-size: 10px;
+}
+
+@media (max-width: 520px) {
+  .swap-shell {
+    width: 100%;
+  }
+
+  .swap-heading {
+    padding-bottom: 14px;
+    text-align: left;
+  }
+
+  .swap-heading .eyebrow {
+    justify-content: flex-start;
+  }
+
+  .swap-heading h2 {
+    font-size: 28px;
+  }
+
+  .swap-heading p {
+    margin-top: 8px;
+    font-size: 11px;
+  }
+
+  .swap-card {
+    padding: 13px;
+    border-radius: 17px;
+  }
+
+  .swap-card-head {
+    margin-bottom: 10px;
+  }
+
+  .swap-box {
+    padding: 9px 10px;
+  }
+
+  .swap-input {
+    height: 31px;
+    font-size: 23px;
+  }
+
+  .token-select {
+    min-height: 34px;
+    padding: 0 8px;
+  }
+
+  .swap-rate {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+    padding: 7px 2px;
+  }
+
+  .swap-summary-row {
+    font-size: 9px;
+  }
+
+  .swap-btn {
+    min-height: 44px;
+  }
+
+  .swap-status {
+    font-size: 9px;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .top-actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+
+  .tabs {
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  .tab {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 4px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .swap-card,
+  .swap-box {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .swap-box-main {
+    min-width: 0;
+  }
+
+  .token-select {
+    max-width: 48%;
+  }
+}
