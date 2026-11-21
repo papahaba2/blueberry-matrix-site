@@ -392,30 +392,26 @@ code,
 }
 
 /* Grids: 1 / 2 / 3 / 4 columns, matching the requested responsive scale. */
-.landing-stats {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-  gap: 14px !important;
-}
-
+.landing-stats,
 .stats {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  grid-template-columns: 1fr !important;
   gap: 14px !important;
 }
 
 .actions {
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-template-columns: 1fr !important;
   gap: 14px !important;
 }
 
 .roadmap-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  grid-template-columns: 1fr !important;
 }
 
 .governance-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-template-columns: 1fr !important;
 }
 
-@media (max-width: 1199px) {
+@media (min-width: 600px) {
   .landing-stats,
   .stats {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
@@ -423,6 +419,36 @@ code,
 
   .roadmap-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .governance-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 900px) {
+  .landing-stats,
+  .stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .roadmap-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 1400px) {
+  .landing-stats,
+  .stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .roadmap-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
 }
 
