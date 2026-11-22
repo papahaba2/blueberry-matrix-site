@@ -18,11 +18,17 @@ export const CONTRACTS = {
     ZERO_ADDRESS) as Address,
 } as const;
 
+/** First block where the manager was deployed. Use 0 to disable event scans. */
+export const MANAGER_DEPLOY_BLOCK = Number(
+  process.env.NEXT_PUBLIC_LIMIT_ORDER_MANAGER_DEPLOY_BLOCK || "0",
+);
+
 export type Token = {
   symbol: string;
   name: string;
   address: Address;
   decimals: number;
+  priceUsd?: number;
 };
 
 export const TOKENS = {
@@ -31,20 +37,60 @@ export const TOKENS = {
     name: "Wrapped Fuse",
     address: "0x0BE9e53fd7EDaC9F859882AfdDa116645287C629",
     decimals: 18,
+    priceUsd: Number(process.env.NEXT_PUBLIC_WFUSE_USD_PRICE || "0.05"),
   },
   USDC: {
     symbol: "USDC",
     name: "USD Coin",
     address: "0x620fd5fa44BE6af63715Ef4E65DDFA0387aD13F5",
     decimals: 6,
+    priceUsd: 1,
   },
   VOLT: {
     symbol: "VOLT",
     name: "Voltage",
     address: "0x34Ef2Cc892a88415e9f02b91BfA9c91fC0bE6bD4",
     decimals: 18,
+    priceUsd: Number(process.env.NEXT_PUBLIC_VOLT_USD_PRICE || "0"),
   },
 } as const satisfies Record<string, Token>;
+
+export type VaultConfig = {
+  id: string;
+  name: string;
+  shareSymbol: string;
+  address: Address;
+  asset: Token;
+  aprBps: number;
+  priceUsd: number;
+  /** Optional hardcoded USD price for the vault asset. */
+};
+
+const WFUSE_VAULT_ADDRESS = (process.env.NEXT_PUBLIC_WFUSE_VAULT_ADDRESS ||
+  "0xf1227c2419f3535d918B0174b7Df5AbC602d718e") as Address;
+const USDC_VAULT_ADDRESS = (process.env.NEXT_PUBLIC_USDC_VAULT_ADDRESS ||
+  "0x53968BA736439d7838E88e0F7BCb47A4d9C6955a") as Address;
+
+export const VAULTS: VaultConfig[] = [
+  {
+    id: "wfuse",
+    name: "WFUSE Vault",
+    shareSymbol: "bbWFUSE",
+    address: WFUSE_VAULT_ADDRESS,
+    asset: TOKENS.WFUSE,
+    aprBps: Number(process.env.NEXT_PUBLIC_WFUSE_VAULT_APR_BPS || "20010"),
+    priceUsd: TOKENS.WFUSE.priceUsd ?? 0,
+  },
+  {
+    id: "usdc",
+    name: "USDC Vault",
+    shareSymbol: "bbUSDC",
+    address: USDC_VAULT_ADDRESS,
+    asset: TOKENS.USDC,
+    aprBps: Number(process.env.NEXT_PUBLIC_USDC_VAULT_APR_BPS || "0"),
+    priceUsd: 1,
+  },
+];
 
 export type Pair = {
   id: string;
@@ -156,6 +202,107 @@ export const ERC20_ABI = [
 ] as const;
 
 export const LIMIT_ORDER_MANAGER_ABI = ManagerAbi as Abi;
+
+export const VAULT_ABI = [
+  {
+    inputs: [],
+    name: "asset",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalAssets",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalSupply",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "shares", type: "uint256" }],
+    name: "convertToAssets",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "assets", type: "uint256" }],
+    name: "convertToShares",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint256", name: "assets", type: "uint256" },
+      { internalType: "address", name: "receiver", type: "address" },
+    ],
+    name: "deposit",
+    outputs: [{ internalType: "uint256", name: "shares", type: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint256", name: "shares", type: "uint256" },
+      { internalType: "address", name: "receiver", type: "address" },
+      { internalType: "address", name: "owner", type: "address" },
+    ],
+    name: "redeem",
+    outputs: [{ internalType: "uint256", name: "assets", type: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint256", name: "assets", type: "uint256" },
+      { internalType: "address", name: "receiver", type: "address" },
+      { internalType: "address", name: "owner", type: "address" },
+    ],
+    name: "withdraw",
+    outputs: [{ internalType: "uint256", name: "shares", type: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "account", type: "address" }],
+    name: "balanceOf",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "owner", type: "address" },
+      { internalType: "address", name: "spender", type: "address" },
+    ],
+    name: "allowance",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "spender", type: "address" },
+      { internalType: "uint256", name: "amount", type: "uint256" },
+    ],
+    name: "approve",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+export function isVaultConfigured(vault: VaultConfig): boolean {
+  return vault.address !== ZERO_ADDRESS;
+}
 
 export function isManagerConfigured(): boolean {
   return CONTRACTS.limitOrderManager !== ZERO_ADDRESS;
