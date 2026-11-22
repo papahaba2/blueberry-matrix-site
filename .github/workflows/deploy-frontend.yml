@@ -40,6 +40,7 @@ jobs:
           # in the workflow or use a repository variable.
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
           NEXT_PUBLIC_LIMIT_ORDER_MANAGER_ADDRESS: ${{ vars.V4_LIMIT_ORDER_MANAGER }}
+          NEXT_PUBLIC_LIMIT_ORDER_MANAGER_DEPLOY_BLOCK: ${{ vars.V4_LIMIT_ORDER_MANAGER_DEPLOY_BLOCK }}
           NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${{ secrets.WALLETCONNECT_PROJECT_ID }}
         run: npm run build
 
