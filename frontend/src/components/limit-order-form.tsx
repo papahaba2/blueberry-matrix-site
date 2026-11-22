@@ -9,37 +9,36 @@ import {
   useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
+import PairSearch from "@/components/pair-search";
 import {
   CONTRACTS,
   ERC20_ABI,
-  FACTORY_ABI,
   LIMIT_ORDER_MANAGER_ABI,
-  PAIRS,
   POOL_ABI,
-  ZERO_ADDRESS,
   isManagerConfigured,
-  sortTokens,
+  tokenByAddress,
 } from "@/config";
+import type { PoolInfo } from "@/utils/getAllPools";
 
-type RangeState = "loading" | "invalid" | "in-range" | "above" | "below";
+type RangeState = "empty" | "loading" | "invalid" | "in-range" | "above" | "below";
 
-function mapContractError(error: unknown, token0: string, token1: string): string {
+type TokenLeg = {
+  address: Address;
+  symbol: string;
+  decimals: number;
+};
+
+function mapContractError(error: unknown, symbol0: string, symbol1: string): string {
   const raw = error instanceof Error ? error.message : String(error);
 
   if (raw.includes("Order must be created out-of-range")) {
     return "Диапазон ордера должен быть выше или ниже текущей цены.";
   }
   if (raw.includes("tokenIn must be token0")) {
-    return `Для выбранного диапазона необходимо вносить ${token0}.`;
+    return `Для выбранного диапазона необходимо вносить ${symbol0}.`;
   }
   if (raw.includes("tokenIn must be token1")) {
-    return `Для выбранного диапазона необходимо вносить ${token1}.`;
-  }
-  if (raw.includes("tokenOut must be token0")) {
-    return `Для выбранного диапазона выход должен быть в ${token0}.`;
-  }
-  if (raw.includes("tokenOut must be token1")) {
-    return `Для выбранного диапазона выход должен быть в ${token1}.`;
+    return `Для выбранного диапазона необходимо вносить ${symbol1}.`;
   }
   if (raw.includes("not executable")) {
     return "Ордер ещё не достиг целевой цены.";
@@ -61,40 +60,43 @@ export default function LimitOrderForm({
 }) {
   const { address: account, isConnected } = useAccount();
 
-  const [pairId, setPairId] = useState(PAIRS[0].id);
+  const [pool, setPool] = useState<PoolInfo | null>(null);
   const [tickLower, setTickLower] = useState("");
   const [tickUpper, setTickUpper] = useState("");
   const [amount, setAmount] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
   const [approveHash, setApproveHash] = useState<Hash>();
   const [createHash, setCreateHash] = useState<Hash>();
 
-  const pair = PAIRS.find((item) => item.id === pairId) ?? PAIRS[0];
-  const [token0, token1] = useMemo(
-    () => sortTokens(pair.a, pair.b),
-    [pair],
+  const token0 = useMemo<TokenLeg | null>(
+    () =>
+      pool
+        ? {
+            address: pool.token0 as Address,
+            symbol: pool.symbol0,
+            decimals: pool.decimals0,
+          }
+        : null,
+    [pool],
+  );
+  const token1 = useMemo<TokenLeg | null>(
+    () =>
+      pool
+        ? {
+            address: pool.token1 as Address,
+            symbol: pool.symbol1,
+            decimals: pool.decimals1,
+          }
+        : null,
+    [pool],
   );
 
-  const poolRead = useReadContract({
-    address: CONTRACTS.factory,
-    abi: FACTORY_ABI,
-    functionName: "poolByPair",
-    args: [token0.address, token1.address],
-    query: { enabled: true },
-  });
-
-  const poolAddress =
-    poolRead.data && poolRead.data !== ZERO_ADDRESS
-      ? (poolRead.data as Address)
-      : undefined;
-
   const stateRead = useReadContract({
-    address: poolAddress,
+    address: (pool?.poolAddress as Address | undefined) ?? undefined,
     abi: POOL_ABI,
     functionName: "globalState",
-    query: { enabled: Boolean(poolAddress) },
+    query: { enabled: Boolean(pool) },
   });
 
   const currentTick =
@@ -102,27 +104,35 @@ export default function LimitOrderForm({
       ? stateRead.data[1]
       : undefined;
 
+  const currentPrice = useMemo(() => {
+    if (!pool || currentTick === undefined) return null;
+    const raw = 1.0001 ** currentTick;
+    const decimals = pool.decimals0 - pool.decimals1;
+    return raw * 10 ** decimals;
+  }, [currentTick, pool]);
+
   const lower = Number.parseInt(tickLower, 10);
   const upper = Number.parseInt(tickUpper, 10);
   const ticksValid =
     Number.isFinite(lower) && Number.isFinite(upper) && lower < upper;
 
-  const rangeState: RangeState = !ticksValid
-    ? "invalid"
-    : currentTick === undefined
-      ? "loading"
-      : lower <= currentTick && currentTick <= upper
-        ? "in-range"
-        : lower > currentTick
-          ? "above"
-          : "below";
+  const rangeState: RangeState = !pool
+    ? "empty"
+    : !ticksValid
+      ? "invalid"
+      : currentTick === undefined
+        ? "loading"
+        : lower <= currentTick && currentTick <= upper
+          ? "in-range"
+          : lower > currentTick
+            ? "above"
+            : "below";
 
-  // Strict contract rule: above current tick => deposit token0;
-  // below current tick => deposit token1.
+  // Strict contract rule: above current tick => token0, below => token1.
   const tokenIn =
-    rangeState === "above" ? token0 : rangeState === "below" ? token1 : undefined;
+    rangeState === "above" ? token0 : rangeState === "below" ? token1 : null;
   const tokenOut =
-    rangeState === "above" ? token1 : rangeState === "below" ? token0 : undefined;
+    rangeState === "above" ? token1 : rangeState === "below" ? token0 : null;
 
   const amountIn = useMemo(() => {
     if (!tokenIn || !amount.trim()) return null;
@@ -146,10 +156,7 @@ export default function LimitOrderForm({
     address: tokenIn?.address,
     abi: ERC20_ABI,
     functionName: "allowance",
-    args:
-      account && tokenIn
-        ? [account, CONTRACTS.limitOrderManager]
-        : undefined,
+    args: account && tokenIn ? [account, CONTRACTS.limitOrderManager] : undefined,
     query: { enabled: Boolean(tokenIn && account) },
   });
 
@@ -159,14 +166,15 @@ export default function LimitOrderForm({
 
   const expectedOut = useMemo(() => {
     if (!amountIn || !tokenIn || !tokenOut) return null;
-    if (!tokenIn.priceUsd || !tokenOut.priceUsd) return null;
+    const inPrice = tokenByAddress(tokenIn.address)?.priceUsd;
+    const outPrice = tokenByAddress(tokenOut.address)?.priceUsd;
+    if (!inPrice || !outPrice) return null;
     const input = Number(formatUnits(amountIn, tokenIn.decimals));
-    const output = (input * tokenIn.priceUsd) / tokenOut.priceUsd;
+    const output = (input * inPrice) / outPrice;
     return Number.isFinite(output) && output > 0 ? output : null;
   }, [amountIn, tokenIn, tokenOut]);
 
   const { writeContractAsync, isPending } = useWriteContract();
-
   const approveReceipt = useWaitForTransactionReceipt({ hash: approveHash });
   const createReceipt = useWaitForTransactionReceipt({ hash: createHash });
 
@@ -176,9 +184,7 @@ export default function LimitOrderForm({
       setSuccess("Approval подтверждён. Теперь можно создать лимитный ордер.");
       setError("");
     }
-    // The refetch function is stable; the receipt flag is the trigger.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [approveReceipt.isSuccess]);
+  }, [approveReceipt.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (createReceipt.isSuccess) {
@@ -197,11 +203,11 @@ export default function LimitOrderForm({
     if (!isConnected || !account) {
       return "Подключите кошелёк, чтобы создать лимитный ордер.";
     }
-    if (poolRead.isLoading || stateRead.isLoading) {
-      return "Загружаем текущую цену пула...";
+    if (!pool || !token0 || !token1) {
+      return "Выберите пул из списка.";
     }
-    if (!poolAddress) {
-      return "Пул для этой пары не найден на Fuse.";
+    if (stateRead.isLoading) {
+      return "Загружаем текущую цену пула...";
     }
     if (currentTick === undefined) {
       return "Не удалось прочитать currentTick пула.";
@@ -228,11 +234,12 @@ export default function LimitOrderForm({
     balance,
     currentTick,
     isConnected,
-    poolAddress,
-    poolRead.isLoading,
+    pool,
     rangeState,
     stateRead.isLoading,
     ticksValid,
+    token0,
+    token1,
     tokenIn,
     tokenOut,
   ]);
@@ -250,7 +257,7 @@ export default function LimitOrderForm({
       });
       setApproveHash(hash);
     } catch (err) {
-      setError(mapContractError(err, token0.symbol, token1.symbol));
+      setError(mapContractError(err, token0?.symbol ?? "", token1?.symbol ?? ""));
     }
   };
 
@@ -263,17 +270,11 @@ export default function LimitOrderForm({
         address: CONTRACTS.limitOrderManager,
         abi: LIMIT_ORDER_MANAGER_ABI,
         functionName: "createOrder",
-        args: [
-          tokenIn.address,
-          tokenOut.address,
-          amountIn,
-          lower,
-          upper,
-        ],
+        args: [tokenIn.address, tokenOut.address, amountIn, lower, upper],
       });
       setCreateHash(hash);
     } catch (err) {
-      setError(mapContractError(err, token0.symbol, token1.symbol));
+      setError(mapContractError(err, token0?.symbol ?? "", token1?.symbol ?? ""));
     }
   };
 
@@ -281,42 +282,38 @@ export default function LimitOrderForm({
   const submitDisabled = Boolean(validationError) || busy;
   const hint =
     rangeState === "above"
-      ? `Для этого диапазона вы должны внести ${token0.symbol}`
+      ? `Для этого диапазона вы должны внести ${token0?.symbol}`
       : rangeState === "below"
-        ? `Для этого диапазона вы должны внести ${token1.symbol}`
+        ? `Для этого диапазона вы должны внести ${token1?.symbol}`
         : "";
 
   return (
     <div className="glass rounded-2xl p-4 md:p-6">
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="label">Pair</label>
-          <select
-            className="field"
-            value={pairId}
-            onChange={(event) => {
-              setPairId(event.target.value);
+          <label className="label">Pool</label>
+          <PairSearch
+            onSelect={(selected) => {
+              setPool(selected);
               setTickLower("");
               setTickUpper("");
               setAmount("");
               setError("");
               setSuccess("");
             }}
-          >
-            {PAIRS.map((item) => (
-              <option key={item.id} value={item.id} className="bg-ink">
-                {item.label}
-              </option>
-            ))}
-          </select>
+          />
         </div>
 
         <div>
-          <label className="label">Current tick</label>
-          <div className="field flex items-center justify-between text-muted">
+          <label className="label">Current tick / price</label>
+          <div className="field flex items-center justify-between gap-3 text-muted">
             <span>{currentTick ?? "—"}</span>
-            <span className="text-[9px] uppercase tracking-[0.16em]">
-              {poolAddress ? "pool live" : "no pool"}
+            <span className="truncate font-mono text-[10px] text-brand-soft">
+              {currentPrice !== null && pool
+                ? `1 ${pool.symbol0} = ${currentPrice.toLocaleString("en-US", {
+                    maximumSignificantDigits: 6,
+                  })} ${pool.symbol1}`
+                : "select pool"}
             </span>
           </div>
         </div>
@@ -329,6 +326,7 @@ export default function LimitOrderForm({
             placeholder="например -120000"
             value={tickLower}
             onChange={(event) => setTickLower(event.target.value)}
+            disabled={!pool}
           />
         </div>
 
@@ -340,6 +338,7 @@ export default function LimitOrderForm({
             placeholder="например -60000"
             value={tickUpper}
             onChange={(event) => setTickUpper(event.target.value)}
+            disabled={!pool}
           />
         </div>
       </div>
@@ -376,7 +375,7 @@ export default function LimitOrderForm({
           <label className="label mb-2">Amount</label>
           <button
             type="button"
-            className="mb-2 font-mono text-[9px] uppercase tracking-[0.14em] text-muted hover:text-white"
+            className="mb-2 font-mono text-[9px] uppercase tracking-[0.14em] text-muted hover:text-white disabled:opacity-30"
             onClick={() => {
               if (!tokenIn) return;
               setAmount(formatUnits(balance, tokenIn.decimals));
