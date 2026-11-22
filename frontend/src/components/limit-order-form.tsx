@@ -82,7 +82,7 @@ export default function LimitOrderForm({
     abi: FACTORY_ABI,
     functionName: "poolByPair",
     args: [token0.address, token1.address],
-    query: { enabled: isConnected },
+    query: { enabled: true },
   });
 
   const poolAddress =
