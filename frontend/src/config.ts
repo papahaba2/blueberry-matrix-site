@@ -11,11 +11,20 @@ export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Addr
  * The manager address is injected at build time so the same source can target
  * a fresh deployment without editing code.
  */
+export const LIMIT_ORDER_MANAGER_ADDRESS = (
+  process.env.NEXT_PUBLIC_LIMIT_ORDER_MANAGER_ADDRESS ||
+  "0xe634e39e96Ad25644B4511c738f7857F87337929"
+).trim() as Address;
+
+/**
+ * Deployed Fuse V4 contracts.
+ * The manager falls back to the live deployment when the build variable is
+ * absent, so the UI never shows a false "not configured" error.
+ */
 export const CONTRACTS = {
   factory: "0xccEdb990abBf0606Cf47e7C6A26e419931c7dc1F" as Address,
   positionManager: "0x52B649B1cE77B349C53Bf0284ba61FD8975e7798" as Address,
-  limitOrderManager: (process.env.NEXT_PUBLIC_LIMIT_ORDER_MANAGER_ADDRESS ||
-    ZERO_ADDRESS) as Address,
+  limitOrderManager: LIMIT_ORDER_MANAGER_ADDRESS,
 } as const;
 
 /** First block where the manager was deployed. Use 0 to disable event scans. */
