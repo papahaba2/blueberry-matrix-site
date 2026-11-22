@@ -12,7 +12,7 @@ const FACTORY_DEPLOY_BLOCK = Number(
   process.env.NEXT_PUBLIC_ALGEBRA_FACTORY_DEPLOY_BLOCK || "32498119",
 );
 const BLOCK_CHUNK = 50_000;
-const CACHE_KEY = "blueberry:algebra-pools:v2";
+const CACHE_KEY = "blueberry:algebra-pools:v3";
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 export type PoolInfo = {
@@ -24,6 +24,7 @@ export type PoolInfo = {
   decimals0: number;
   decimals1: number;
   fee: number;
+  tickSpacing: number;
   poolAddress: string;
 };
 
@@ -43,6 +44,7 @@ const poolAbi = [
   "function token0() view returns (address)",
   "function token1() view returns (address)",
   "function fee() view returns (uint16)",
+  "function tickSpacing() view returns (int24)",
 ];
 
 const tokenAbi = [
@@ -179,10 +181,11 @@ export async function getAllPools(forceRefresh = false): Promise<PoolInfo[]> {
     const pools = await inBatches(Array.from(poolAddresses), 10, async (poolAddress) => {
       try {
         const pool = new Contract(poolAddress, poolAbi, rpc);
-        const [token0, token1, fee] = await Promise.all([
+        const [token0, token1, fee, tickSpacing] = await Promise.all([
           pool.token0(),
           pool.token1(),
           pool.fee(),
+          pool.tickSpacing(),
         ]);
 
         return {
@@ -190,6 +193,7 @@ export async function getAllPools(forceRefresh = false): Promise<PoolInfo[]> {
           token0: getAddress(token0),
           token1: getAddress(token1),
           fee: Number(fee),
+          tickSpacing: Number(tickSpacing),
         };
       } catch {
         return null;
