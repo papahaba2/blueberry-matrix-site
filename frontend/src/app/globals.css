@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #09090b;
+  --brand: #875cff;
+  --brand-soft: #b8a4ff;
+  --fog: #e8e4f2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--ink);
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(1000px 600px at 50% -12%, rgba(135, 92, 255, 0.14), transparent 62%),
+    var(--ink);
+  color: var(--fog);
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(135, 92, 255, 0.35);
+  color: #fff;
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: #09090b;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid #09090b;
+  border-radius: 999px;
+  background: rgba(135, 92, 255, 0.45);
+}
+
+@layer components {
+  .glass {
+    @apply border border-white/[0.08] bg-white/[0.03] shadow-glass backdrop-blur-2xl;
+  }
+
+  .page-shell {
+    @apply mx-auto w-full max-w-[1200px] px-4 md:px-6;
+  }
+
+  .eyebrow {
+    @apply font-mono text-[9px] uppercase tracking-[0.22em] text-muted;
+  }
+
+  .field {
+    @apply w-full rounded-xl border border-white/[0.1] bg-black/20 px-3 py-3 font-mono text-sm text-white outline-none transition-colors placeholder:text-faint focus:border-brand/60 focus:ring-2 focus:ring-brand/15;
+  }
+
+  .label {
+    @apply mb-2 block font-mono text-[9px] uppercase tracking-[0.18em] text-faint;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl bg-brand px-4 py-3 text-[12px] font-bold text-white shadow-brand transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-xl border border-white/[0.1] bg-white/[0.03] px-4 py-3 text-[12px] font-semibold text-white/80 transition-colors hover:border-white/[0.2] hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+}
+
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
