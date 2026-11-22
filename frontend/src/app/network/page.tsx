@@ -1,26 +1,8 @@
-import {
-  CONTRACTS,
-  EXPLORER_URL,
-  TOKENS,
-  explorerAddress,
-  explorerToken,
-  isManagerConfigured,
-} from "@/config";
-
-function shorten(address: string) {
-  return `${address.slice(0, 8)}…${address.slice(-6)}`;
-}
+import ContractAddresses from "@/components/contract-addresses";
+import NetworkStats from "@/components/network-stats";
+import { EXPLORER_URL, TOKENS, explorerToken } from "@/config";
 
 export default function NetworkPage() {
-  const contracts = [
-    ["Algebra Factory", CONTRACTS.factory],
-    ["NonfungiblePositionManager", CONTRACTS.positionManager],
-    [
-      "V4LimitOrderManager",
-      isManagerConfigured() ? CONTRACTS.limitOrderManager : "Not configured",
-    ],
-  ] as const;
-
   return (
     <div className="page-shell py-10 md:py-16">
       <div className="eyebrow flex items-center gap-3">
@@ -32,59 +14,40 @@ export default function NetworkPage() {
         <br />
         <span className="text-brand-soft">by default.</span>
       </h1>
-      <p className="mt-5 max-w-[520px] text-[13px] leading-6 text-muted">
-        Every contract address used by the interface is listed below. All links
-        point directly to the Fuse Blockscout explorer.
+      <p className="mt-5 max-w-[540px] text-[13px] leading-6 text-muted">
+        Live protocol data, every contract address and the tokens used by the
+        interface. Everything is read directly from Fuse Mainnet.
       </p>
 
-      <div className="mt-10 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <section className="glass overflow-hidden rounded-2xl">
-          <div className="border-b border-white/[0.07] px-5 py-4">
-            <p className="label mb-0">Deployed contracts</p>
-          </div>
-          <div className="divide-y divide-white/[0.06]">
-            {contracts.map(([name, address]) => (
-              <div
-                key={name}
-                className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="text-[12px] font-semibold text-white">{name}</p>
-                  <p className="mt-1 font-mono text-[10px] text-faint">{address}</p>
-                </div>
-                {address.startsWith("0x") ? (
-                  <a
-                    href={explorerAddress(address)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] font-semibold text-brand-soft hover:text-white"
-                  >
-                    {shorten(address)} ↗
-                  </a>
-                ) : (
-                  <span className="text-[10px] text-faint">Set env →</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
+      <div className="mt-9">
+        <NetworkStats />
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <ContractAddresses />
 
         <section className="glass rounded-2xl p-5">
           <p className="label">Tokens</p>
           <div className="mt-2 divide-y divide-white/[0.06]">
             {Object.values(TOKENS).map((token) => (
-              <div key={token.symbol} className="flex items-center justify-between py-3">
-                <div>
+              <div
+                key={token.symbol}
+                className="flex items-center justify-between gap-4 py-3"
+              >
+                <div className="min-w-0">
                   <p className="font-mono text-sm text-white">{token.symbol}</p>
-                  <p className="mt-1 font-mono text-[9px] text-faint">
+                  <p className="mt-1 truncate font-mono text-[9px] text-faint">
                     {token.address}
+                  </p>
+                  <p className="mt-1 font-mono text-[9px] text-faint">
+                    {token.decimals} decimals
                   </p>
                 </div>
                 <a
                   href={explorerToken(token.address)}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-[10px] text-brand-soft hover:text-white"
+                  className="shrink-0 text-[10px] text-brand-soft hover:text-white"
                 >
                   Explorer ↗
                 </a>
