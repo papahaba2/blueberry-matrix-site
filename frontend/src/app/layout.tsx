@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import AppProviders from "@/components/app-providers";
+import AppToaster from "@/components/app-toaster";
 import SiteFooter from "@/components/site-footer";
 import SiteHeader from "@/components/site-header";
 import SmoothScroll from "@/components/smooth-scroll";
@@ -49,6 +50,7 @@ export default function RootLayout({
             <SiteHeader />
             <main className="min-h-screen pt-24">{children}</main>
             <SiteFooter />
+            <AppToaster />
           </SmoothScroll>
         </AppProviders>
       </body>
