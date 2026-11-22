@@ -54,7 +54,11 @@ function mapContractError(error: unknown, token0: string, token1: string): strin
   return raw.length > 180 ? `${raw.slice(0, 177)}...` : raw;
 }
 
-export default function LimitOrderForm() {
+export default function LimitOrderForm({
+  onCreated,
+}: {
+  onCreated?: () => void;
+}) {
   const { address: account, isConnected } = useAccount();
 
   const [pairId, setPairId] = useState(PAIRS[0].id);
@@ -153,6 +157,14 @@ export default function LimitOrderForm() {
   const allowance = allowanceRead.data ?? 0n;
   const needsApproval = amountIn !== null && allowance < amountIn;
 
+  const expectedOut = useMemo(() => {
+    if (!amountIn || !tokenIn || !tokenOut) return null;
+    if (!tokenIn.priceUsd || !tokenOut.priceUsd) return null;
+    const input = Number(formatUnits(amountIn, tokenIn.decimals));
+    const output = (input * tokenIn.priceUsd) / tokenOut.priceUsd;
+    return Number.isFinite(output) && output > 0 ? output : null;
+  }, [amountIn, tokenIn, tokenOut]);
+
   const { writeContractAsync, isPending } = useWriteContract();
 
   const approveReceipt = useWaitForTransactionReceipt({ hash: approveHash });
@@ -174,8 +186,9 @@ export default function LimitOrderForm() {
       setError("");
       setAmount("");
       setCreateHash(undefined);
+      onCreated?.();
     }
-  }, [createReceipt.isSuccess]);
+  }, [createReceipt.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const validationError = useMemo(() => {
     if (!isManagerConfigured()) {
@@ -347,6 +360,15 @@ export default function LimitOrderForm() {
           </div>
         </div>
         {hint && <p className="mt-3 text-[11px] text-muted">{hint}</p>}
+        {expectedOut !== null && tokenOut && (
+          <p className="mt-2 font-mono text-[10px] text-faint">
+            Spot estimate: ~
+            {expectedOut.toLocaleString("en-US", {
+              maximumFractionDigits: 6,
+            })}{" "}
+            {tokenOut.symbol}
+          </p>
+        )}
       </div>
 
       <div className="mt-4">
