@@ -51,6 +51,14 @@ export default function DepositModal({ vault, open, onClose, onSuccess }: Props)
     query: { enabled: Boolean(account && open) },
   });
 
+  const sharesPreview = useReadContract({
+    address: vault.address,
+    abi: VAULT_ABI,
+    functionName: "convertToShares",
+    args: parsed ? [parsed] : undefined,
+    query: { enabled: Boolean(parsed && open) },
+  });
+
   const balance = balanceRead.data ?? 0n;
   const allowance = allowanceRead.data ?? 0n;
   const needsApproval = parsed !== null && allowance < parsed;
@@ -176,6 +184,15 @@ export default function DepositModal({ vault, open, onClose, onSuccess }: Props)
             Balance: {formatUnits(balance, vault.asset.decimals)}{" "}
             {vault.asset.symbol}
           </p>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-white/[0.07] bg-black/20 p-3">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="text-muted">You will receive</span>
+            <span className="font-mono text-white">
+              ~{formatUnits(sharesPreview.data ?? 0n, 18)} {vault.shareSymbol}
+            </span>
+          </div>
         </div>
 
         {error && (
