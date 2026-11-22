@@ -15,10 +15,12 @@ import {
   ERC20_ABI,
   LIMIT_ORDER_MANAGER_ABI,
   POOL_ABI,
+  ZERO_ADDRESS,
   isManagerConfigured,
   tokenByAddress,
 } from "@/config";
 import type { PoolInfo } from "@/utils/getAllPools";
+import { poolFeeLabel } from "@/utils/getAllPools";
 
 type RangeState = "empty" | "loading" | "invalid" | "in-range" | "above" | "below";
 
@@ -113,8 +115,24 @@ export default function LimitOrderForm({
 
   const lower = Number.parseInt(tickLower, 10);
   const upper = Number.parseInt(tickUpper, 10);
+  const integerTicks =
+    /^-?\d+$/.test(tickLower.trim()) && /^-?\d+$/.test(tickUpper.trim());
   const ticksValid =
-    Number.isFinite(lower) && Number.isFinite(upper) && lower < upper;
+    integerTicks &&
+    Number.isFinite(lower) &&
+    Number.isFinite(upper) &&
+    lower < upper;
+  const tickSpacing = pool?.tickSpacing ?? 0;
+  const spacingValid =
+    tickSpacing > 0 &&
+    Number.isFinite(lower) &&
+    Number.isFinite(upper) &&
+    lower % tickSpacing === 0 &&
+    upper % tickSpacing === 0;
+  const nearestLower =
+    tickSpacing > 0 ? Math.round(lower / tickSpacing) * tickSpacing : 0;
+  const nearestUpper =
+    tickSpacing > 0 ? Math.round(upper / tickSpacing) * tickSpacing : 0;
 
   const rangeState: RangeState = !pool
     ? "empty"
@@ -206,14 +224,23 @@ export default function LimitOrderForm({
     if (!pool || !token0 || !token1) {
       return "Выберите пул из списка.";
     }
+    if (pool.poolAddress === ZERO_ADDRESS) {
+      return "Пул для этой пары не найден. Возможно, он ещё не создан.";
+    }
     if (stateRead.isLoading) {
       return "Загружаем текущую цену пула...";
     }
     if (currentTick === undefined) {
       return "Не удалось прочитать currentTick пула.";
     }
-    if (!ticksValid) {
+    if (!integerTicks) {
+      return "Тики должны быть целыми числами.";
+    }
+    if (!Number.isFinite(lower) || !Number.isFinite(upper) || lower >= upper) {
       return "Нижний тик должен быть меньше верхнего.";
+    }
+    if (!spacingValid) {
+      return `Тики должны быть кратны tickSpacing ${tickSpacing}. Ближайшие значения: ${nearestLower} и ${nearestUpper}.`;
     }
     if (rangeState === "in-range") {
       return "Лимитный ордер должен быть вне текущего диапазона. Для входа по рыночной цене используйте обычный Swap.";
@@ -233,10 +260,15 @@ export default function LimitOrderForm({
     amountIn,
     balance,
     currentTick,
+    integerTicks,
     isConnected,
+    nearestLower,
+    nearestUpper,
     pool,
     rangeState,
+    spacingValid,
     stateRead.isLoading,
+    tickSpacing,
     ticksValid,
     token0,
     token1,
@@ -307,7 +339,7 @@ export default function LimitOrderForm({
         <div>
           <label className="label">Current tick / price</label>
           <div className="field flex items-center justify-between gap-3 text-muted">
-            <span>{currentTick ?? "—"}</span>
+            <span>{stateRead.isLoading ? "…" : (currentTick ?? "—")}</span>
             <span className="truncate font-mono text-[10px] text-brand-soft">
               {currentPrice !== null && pool
                 ? `1 ${pool.symbol0} = ${currentPrice.toLocaleString("en-US", {
@@ -316,6 +348,11 @@ export default function LimitOrderForm({
                 : "select pool"}
             </span>
           </div>
+          {pool && (
+            <p className="mt-2 font-mono text-[9px] text-faint">
+              fee {poolFeeLabel(pool.fee)} · tickSpacing {pool.tickSpacing}
+            </p>
+          )}
         </div>
 
         <div>
@@ -342,6 +379,12 @@ export default function LimitOrderForm({
           />
         </div>
       </div>
+
+      {pool?.poolAddress === ZERO_ADDRESS && (
+        <p className="mt-4 rounded-xl border border-amber-400/25 bg-amber-400/[0.07] px-3 py-2 text-[11px] leading-5 text-amber-200">
+          Пул для этой пары не найден. Возможно, он ещё не создан.
+        </p>
+      )}
 
       <div className="mt-5 rounded-xl border border-white/[0.07] bg-black/20 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
