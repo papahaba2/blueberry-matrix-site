@@ -16,6 +16,7 @@ import {
   type Token,
 } from "@/config";
 import type { ProtocolOrder } from "@/hooks/useProtocolData";
+import { formatPrice, priceFromTick } from "@/utils/tickMath";
 
 function tokenSymbol(address: `0x${string}`): string {
   const token: Token | undefined = tokenByAddress(address);
@@ -24,6 +25,41 @@ function tokenSymbol(address: `0x${string}`): string {
 
 function tokenDecimals(address: `0x${string}`): number {
   return tokenByAddress(address)?.decimals ?? 18;
+}
+
+function orderPriceRange(order: ProtocolOrder) {
+  const inSymbol = tokenSymbol(order.tokenIn);
+  const outSymbol = tokenSymbol(order.tokenOut);
+  const inIsToken0 =
+    order.tokenIn.toLowerCase() < order.tokenOut.toLowerCase();
+  const decimals0 = inIsToken0
+    ? tokenDecimals(order.tokenIn)
+    : tokenDecimals(order.tokenOut);
+  const decimals1 = inIsToken0
+    ? tokenDecimals(order.tokenOut)
+    : tokenDecimals(order.tokenIn);
+
+  const lower0to1 = priceFromTick(order.tickLower, decimals0, decimals1);
+  const upper0to1 = priceFromTick(order.tickUpper, decimals0, decimals1);
+
+  if (!lower0to1 || !upper0to1) return null;
+
+  // Order price is always expressed in tokenOut per tokenIn.
+  if (inIsToken0) {
+    return {
+      lower: lower0to1,
+      upper: upper0to1,
+      unit: outSymbol,
+      ticks: `${order.tickLower} → ${order.tickUpper}`,
+    };
+  }
+
+  return {
+    lower: 1 / upper0to1,
+    upper: 1 / lower0to1,
+    unit: outSymbol,
+    ticks: `${order.tickLower} → ${order.tickUpper}`,
+  };
 }
 
 export default function MyOrdersList({
@@ -116,6 +152,7 @@ export default function MyOrdersList({
         const inSymbol = tokenSymbol(order.tokenIn);
         const outSymbol = tokenSymbol(order.tokenOut);
         const amount = formatUnits(order.amountIn, tokenDecimals(order.tokenIn));
+        const range = orderPriceRange(order);
 
         return (
           <article key={order.orderId} className="glass rounded-2xl p-4">
@@ -150,10 +187,20 @@ export default function MyOrdersList({
                 </p>
               </div>
               <div>
-                <p className="label mb-1">Range</p>
-                <p className="font-mono text-[11px] text-white">
-                  {order.tickLower} → {order.tickUpper}
+                <p className="label mb-1">Price range</p>
+                <p
+                  className="font-mono text-[11px] text-white"
+                  title={range ? `ticks ${range.ticks}` : undefined}
+                >
+                  {range
+                    ? `${formatPrice(range.lower)} → ${formatPrice(range.upper)} ${range.unit}`
+                    : "—"}
                 </p>
+                {range && (
+                  <p className="mt-1 font-mono text-[8px] text-faint">
+                    ticks {range.ticks}
+                  </p>
+                )}
               </div>
               <div>
                 <p className="label mb-1">Token ID</p>
