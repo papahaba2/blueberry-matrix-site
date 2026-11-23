@@ -21,8 +21,21 @@ import {
 } from "@/config";
 import type { PoolInfo } from "@/utils/getAllPools";
 import { poolFeeLabel } from "@/utils/getAllPools";
+import {
+  formatPrice,
+  parsePrice,
+  priceFromTick,
+  rawTickFromPrice,
+  roundToSpacing,
+} from "@/utils/tickMath";
 
 type RangeState = "empty" | "loading" | "invalid" | "in-range" | "above" | "below";
+type Edge = "lower" | "upper";
+type InputMode = "price" | "tick";
+
+function priceInputValue(price: number): string {
+  return Number(price.toPrecision(10)).toString();
+}
 
 type TokenLeg = {
   address: Address;
@@ -34,22 +47,22 @@ function mapContractError(error: unknown, symbol0: string, symbol1: string): str
   const raw = error instanceof Error ? error.message : String(error);
 
   if (raw.includes("Order must be created out-of-range")) {
-    return "Диапазон ордера должен быть выше или ниже текущей цены.";
+    return "Р”РёР°РїР°Р·РѕРЅ РѕСЂРґРµСЂР° РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РІС‹С€Рµ РёР»Рё РЅРёР¶Рµ С‚РµРєСѓС‰РµР№ С†РµРЅС‹.";
   }
   if (raw.includes("tokenIn must be token0")) {
-    return `Для выбранного диапазона необходимо вносить ${symbol0}.`;
+    return `Р”Р»СЏ РІС‹Р±СЂР°РЅРЅРѕРіРѕ РґРёР°РїР°Р·РѕРЅР° РЅРµРѕР±С…РѕРґРёРјРѕ РІРЅРѕСЃРёС‚СЊ ${symbol0}.`;
   }
   if (raw.includes("tokenIn must be token1")) {
-    return `Для выбранного диапазона необходимо вносить ${symbol1}.`;
+    return `Р”Р»СЏ РІС‹Р±СЂР°РЅРЅРѕРіРѕ РґРёР°РїР°Р·РѕРЅР° РЅРµРѕР±С…РѕРґРёРјРѕ РІРЅРѕСЃРёС‚СЊ ${symbol1}.`;
   }
   if (raw.includes("not executable")) {
-    return "Ордер ещё не достиг целевой цены.";
+    return "РћСЂРґРµСЂ РµС‰С‘ РЅРµ РґРѕСЃС‚РёРі С†РµР»РµРІРѕР№ С†РµРЅС‹.";
   }
   if (raw.includes("User rejected") || raw.includes("user rejected")) {
-    return "Транзакция отклонена в кошельке.";
+    return "РўСЂР°РЅР·Р°РєС†РёСЏ РѕС‚РєР»РѕРЅРµРЅР° РІ РєРѕС€РµР»СЊРєРµ.";
   }
   if (raw.includes("no pool")) {
-    return "Для этой пары нет пула Algebra на Fuse.";
+    return "Р”Р»СЏ СЌС‚РѕР№ РїР°СЂС‹ РЅРµС‚ РїСѓР»Р° Algebra РЅР° Fuse.";
   }
 
   return raw.length > 180 ? `${raw.slice(0, 177)}...` : raw;
@@ -65,6 +78,12 @@ export default function LimitOrderForm({
   const [pool, setPool] = useState<PoolInfo | null>(null);
   const [tickLower, setTickLower] = useState("");
   const [tickUpper, setTickUpper] = useState("");
+  const [priceLower, setPriceLower] = useState("");
+  const [priceUpper, setPriceUpper] = useState("");
+  const [lowerMode, setLowerMode] = useState<InputMode>("price");
+  const [upperMode, setUpperMode] = useState<InputMode>("price");
+  const [activeEdge, setActiveEdge] = useState<Edge>("lower");
+  const [roundingHint, setRoundingHint] = useState("");
   const [amount, setAmount] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -127,21 +146,20 @@ export default function LimitOrderForm({
 
   const currentPrice = useMemo(() => {
     if (!pool || currentTick === undefined) return null;
-    const raw = 1.0001 ** currentTick;
-    const decimals = pool.decimals0 - pool.decimals1;
-    return raw * 10 ** decimals;
+    const price = priceFromTick(currentTick, pool.decimals0, pool.decimals1);
+    return price > 0 ? price : null;
   }, [currentTick, pool]);
 
   const lower = Number.parseInt(tickLower, 10);
   const upper = Number.parseInt(tickUpper, 10);
   const integerTicks =
     /^-?\d+$/.test(tickLower.trim()) && /^-?\d+$/.test(tickUpper.trim());
+  const tickSpacing = pool?.tickSpacing ?? 0;
   const ticksValid =
     integerTicks &&
     Number.isFinite(lower) &&
     Number.isFinite(upper) &&
     lower < upper;
-  const tickSpacing = pool?.tickSpacing ?? 0;
   const spacingValid =
     tickSpacing > 0 &&
     Number.isFinite(lower) &&
@@ -165,7 +183,6 @@ export default function LimitOrderForm({
             ? "above"
             : "below";
 
-  // Strict contract rule: above current tick => token0, below => token1.
   const tokenIn =
     rangeState === "above" ? token0 : rangeState === "below" ? token1 : null;
   const tokenOut =
@@ -218,14 +235,14 @@ export default function LimitOrderForm({
   useEffect(() => {
     if (approveReceipt.isSuccess) {
       void allowanceRead.refetch();
-      setSuccess("Approval подтверждён. Теперь можно создать лимитный ордер.");
+      setSuccess("Approval РїРѕРґС‚РІРµСЂР¶РґС‘РЅ. РўРµРїРµСЂСЊ РјРѕР¶РЅРѕ СЃРѕР·РґР°С‚СЊ Р»РёРјРёС‚РЅС‹Р№ РѕСЂРґРµСЂ.");
       setError("");
     }
   }, [approveReceipt.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (createReceipt.isSuccess) {
-      setSuccess("Лимитный ордер создан. Keeper исполнит его после выхода цены из диапазона.");
+      setSuccess("Р›РёРјРёС‚РЅС‹Р№ РѕСЂРґРµСЂ СЃРѕР·РґР°РЅ. Keeper РёСЃРїРѕР»РЅРёС‚ РµРіРѕ РїРѕСЃР»Рµ РІС‹С…РѕРґР° С†РµРЅС‹ РёР· РґРёР°РїР°Р·РѕРЅР°.");
       setError("");
       setAmount("");
       setCreateHash(undefined);
@@ -233,48 +250,150 @@ export default function LimitOrderForm({
     }
   }, [createReceipt.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const setTickForEdge = (edge: Edge, value: string) => {
+    setActiveEdge(edge);
+    setLowerMode(edge === "lower" ? "tick" : lowerMode);
+    setUpperMode(edge === "upper" ? "tick" : upperMode);
+
+    if (edge === "lower") setTickLower(value);
+    else setTickUpper(value);
+
+    if (!pool || !/^-?\d+$/.test(value.trim())) {
+      setRoundingHint("");
+      return;
+    }
+
+    const tick = Number.parseInt(value, 10);
+    const price = priceFromTick(tick, pool.decimals0, pool.decimals1);
+    if (price > 0) {
+      if (edge === "lower") setPriceLower(priceInputValue(price));
+      else setPriceUpper(priceInputValue(price));
+      setRoundingHint(`в‰€ ${formatPrice(price)} ${pool.symbol1}`);
+    }
+  };
+
+  const setPriceForEdge = (edge: Edge, value: string) => {
+    setActiveEdge(edge);
+    setLowerMode(edge === "lower" ? "price" : lowerMode);
+    setUpperMode(edge === "upper" ? "price" : upperMode);
+
+    if (edge === "lower") setPriceLower(value);
+    else setPriceUpper(value);
+
+    if (!pool) return;
+    const price = parsePrice(value);
+    if (price === null) {
+      setRoundingHint("");
+      return;
+    }
+
+    try {
+      const rawTick = rawTickFromPrice(price, pool.decimals0, pool.decimals1);
+      const rounded = roundToSpacing(rawTick, pool.tickSpacing);
+      if (edge === "lower") setTickLower(String(rounded));
+      else setTickUpper(String(rounded));
+      setRoundingHint(
+        `в‰€ tick ${rounded}${rounded !== rawTick ? `, РѕРєСЂСѓРіР»РµРЅРѕ РґРѕ С€Р°РіР° ${pool.tickSpacing}` : ""}`,
+      );
+    } catch {
+      setRoundingHint("Р’РІРµРґРёС‚Рµ РїРѕР»РѕР¶РёС‚РµР»СЊРЅСѓСЋ С†РµРЅСѓ.");
+    }
+  };
+
+  const switchMode = (edge: Edge, mode: InputMode) => {
+    setActiveEdge(edge);
+    if (edge === "lower") setLowerMode(mode);
+    else setUpperMode(mode);
+
+    const tickText = edge === "lower" ? tickLower : tickUpper;
+    const priceText = edge === "lower" ? priceLower : priceUpper;
+
+    if (!pool) return;
+
+    if (mode === "price" && tickText.trim() && priceText.trim() === "") {
+      const tick = Number.parseInt(tickText, 10);
+      if (Number.isFinite(tick)) {
+        const price = priceFromTick(tick, pool.decimals0, pool.decimals1);
+        if (price > 0) {
+          if (edge === "lower") setPriceLower(priceInputValue(price));
+          else setPriceUpper(priceInputValue(price));
+        }
+      }
+    }
+
+    if (mode === "tick" && priceText.trim()) {
+      const price = parsePrice(priceText);
+      if (price !== null) {
+        try {
+          const tick = roundToSpacing(
+            rawTickFromPrice(price, pool.decimals0, pool.decimals1),
+            pool.tickSpacing,
+          );
+          if (edge === "lower") setTickLower(String(tick));
+          else setTickUpper(String(tick));
+        } catch {
+          // Keep the invalid value and let validation explain.
+        }
+      }
+    }
+  };
+
+  const applyPreset = (percent: number) => {
+    if (!currentPrice) return;
+    const target = currentPrice * (1 + percent / 100);
+    if (!Number.isFinite(target) || target <= 0) return;
+    const edge = activeEdge;
+    setPriceForEdge(edge, target.toPrecision(10));
+  };
+
   const validationError = useMemo(() => {
     if (!isManagerConfigured()) {
-      return "Адрес V4LimitOrderManager не настроен в NEXT_PUBLIC_LIMIT_ORDER_MANAGER_ADDRESS.";
+      return "РђРґСЂРµСЃ V4LimitOrderManager РЅРµ РЅР°СЃС‚СЂРѕРµРЅ РІ NEXT_PUBLIC_LIMIT_ORDER_MANAGER_ADDRESS.";
     }
     if (!isConnected || !account) {
-      return "Подключите кошелёк, чтобы создать лимитный ордер.";
+      return "РџРѕРґРєР»СЋС‡РёС‚Рµ РєРѕС€РµР»С‘Рє, С‡С‚РѕР±С‹ СЃРѕР·РґР°С‚СЊ Р»РёРјРёС‚РЅС‹Р№ РѕСЂРґРµСЂ.";
     }
     if (!pool || !token0 || !token1) {
-      return "Выберите пул из списка.";
+      return "Р’С‹Р±РµСЂРёС‚Рµ РїСѓР» РёР· СЃРїРёСЃРєР°.";
     }
     if (pool.poolAddress === ZERO_ADDRESS) {
-      return "Пул для этой пары не найден. Возможно, он ещё не создан.";
+      return "РџСѓР» РґР»СЏ СЌС‚РѕР№ РїР°СЂС‹ РЅРµ РЅР°Р№РґРµРЅ. Р’РѕР·РјРѕР¶РЅРѕ, РѕРЅ РµС‰С‘ РЅРµ СЃРѕР·РґР°РЅ.";
     }
     if (stateRead.isLoading) {
-      return "Загружаем текущую цену пула...";
+      return "Р—Р°РіСЂСѓР¶Р°РµРј С‚РµРєСѓС‰СѓСЋ С†РµРЅСѓ РїСѓР»Р°...";
     }
     if (stateRead.error) {
-      return `Не удалось прочитать пул ${pool.poolAddress}: ${tickReadError}`;
+      return `РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ РїСѓР» ${pool.poolAddress}: ${tickReadError}`;
     }
     if (currentTick === undefined) {
-      return "Не удалось прочитать currentTick пула.";
+      return "РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ currentTick РїСѓР»Р°.";
+    }
+    if (!tickLower.trim() || !tickUpper.trim()) {
+      return "Р’РІРµРґРёС‚Рµ С†РµРЅСѓ РёР»Рё С‚РёРє РґР»СЏ РѕР±РµРёС… РіСЂР°РЅРёС†.";
     }
     if (!integerTicks) {
-      return "Тики должны быть целыми числами.";
+      return "РўРёРєРё РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ С†РµР»С‹РјРё С‡РёСЃР»Р°РјРё.";
+    }
+    if (lower === upper) {
+      return "Р”РёР°РїР°Р·РѕРЅ СЃР»РёС€РєРѕРј СѓР·РєРёР№: РїРѕСЃР»Рµ РѕРєСЂСѓРіР»РµРЅРёСЏ РіСЂР°РЅРёС†С‹ СЃРѕРІРїР°Р»Рё.";
     }
     if (!Number.isFinite(lower) || !Number.isFinite(upper) || lower >= upper) {
-      return "Нижний тик должен быть меньше верхнего.";
+      return "РќРёР¶РЅСЏСЏ РіСЂР°РЅРёС†Р° РґРѕР»Р¶РЅР° Р±С‹С‚СЊ РјРµРЅСЊС€Рµ РІРµСЂС…РЅРµР№.";
     }
     if (!spacingValid) {
-      return `Тики должны быть кратны tickSpacing ${tickSpacing}. Ближайшие значения: ${nearestLower} и ${nearestUpper}.`;
+      return `РўРёРєРё РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ РєСЂР°С‚РЅС‹ tickSpacing ${tickSpacing}. Р‘Р»РёР¶Р°Р№С€РёРµ Р·РЅР°С‡РµРЅРёСЏ: ${nearestLower} Рё ${nearestUpper}.`;
     }
     if (rangeState === "in-range") {
-      return "Лимитный ордер должен быть вне текущего диапазона. Для входа по рыночной цене используйте обычный Swap.";
+      return "Р›РёРјРёС‚РЅС‹Р№ РѕСЂРґРµСЂ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РІРЅРµ С‚РµРєСѓС‰РµРіРѕ РґРёР°РїР°Р·РѕРЅР°. Р”Р»СЏ РІС…РѕРґР° РїРѕ СЂС‹РЅРѕС‡РЅРѕР№ С†РµРЅРµ РёСЃРїРѕР»СЊР·СѓР№С‚Рµ РѕР±С‹С‡РЅС‹Р№ Swap.";
     }
     if (!tokenIn || !tokenOut) {
-      return "Выберите диапазон выше или ниже текущей цены.";
+      return "Р’С‹Р±РµСЂРёС‚Рµ РґРёР°РїР°Р·РѕРЅ РІС‹С€Рµ РёР»Рё РЅРёР¶Рµ С‚РµРєСѓС‰РµР№ С†РµРЅС‹.";
     }
     if (!amountIn) {
-      return `Введите сумму в ${tokenIn.symbol}.`;
+      return `Р’РІРµРґРёС‚Рµ СЃСѓРјРјСѓ РІ ${tokenIn.symbol}.`;
     }
     if (amountIn > balance) {
-      return `Недостаточно ${tokenIn.symbol} в кошельке.`;
+      return `РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ ${tokenIn.symbol} РІ РєРѕС€РµР»СЊРєРµ.`;
     }
     return "";
   }, [
@@ -284,19 +403,23 @@ export default function LimitOrderForm({
     currentTick,
     integerTicks,
     isConnected,
+    lower,
     nearestLower,
     nearestUpper,
     pool,
     rangeState,
     spacingValid,
+    stateRead.error,
     stateRead.isLoading,
-    tickSpacing,
+    tickLower,
     tickReadError,
-    ticksValid,
+    tickSpacing,
+    tickUpper,
     token0,
     token1,
     tokenIn,
     tokenOut,
+    upper,
   ]);
 
   const approve = async () => {
@@ -334,18 +457,18 @@ export default function LimitOrderForm({
   };
 
   const busy = isPending || approveReceipt.isLoading || createReceipt.isLoading;
-  // Explicitly tied to the selected pool + successfully decoded current tick.
   const submitDisabled =
-    !pool ||
-    currentTick === undefined ||
-    Boolean(validationError) ||
-    busy;
+    !pool || currentTick === undefined || Boolean(validationError) || busy;
   const hint =
     rangeState === "above"
-      ? `Для этого диапазона вы должны внести ${token0?.symbol}`
+      ? `Р’С‹С€Рµ С‚РµРєСѓС‰РµР№ С†РµРЅС‹ в†’ РґРµРїРѕР·РёС‚ ${token0?.symbol}`
       : rangeState === "below"
-        ? `Для этого диапазона вы должны внести ${token1?.symbol}`
+        ? `РќРёР¶Рµ С‚РµРєСѓС‰РµР№ С†РµРЅС‹ в†’ РґРµРїРѕР·РёС‚ ${token1?.symbol}`
         : "";
+
+  const pricePlaceholder = pool
+    ? `1 ${pool.symbol0} = вЂ¦ ${pool.symbol1}`
+    : "1 TOKEN0 = вЂ¦ TOKEN1";
 
   return (
     <div className="glass rounded-2xl p-4 md:p-6">
@@ -367,6 +490,12 @@ export default function LimitOrderForm({
               setPool(selected);
               setTickLower("");
               setTickUpper("");
+              setPriceLower("");
+              setPriceUpper("");
+              setLowerMode("price");
+              setUpperMode("price");
+              setActiveEdge("lower");
+              setRoundingHint("");
               setAmount("");
               setError("");
               setSuccess("");
@@ -379,12 +508,12 @@ export default function LimitOrderForm({
           <div className="field flex items-center justify-between gap-3 text-muted">
             <span>
               {!pool
-                ? "—"
+                ? "вЂ”"
                 : stateRead.isLoading
-                  ? "loading…"
+                  ? "loadingвЂ¦"
                   : stateRead.error
                     ? "error"
-                    : (currentTick ?? "—")}
+                    : (currentTick ?? "вЂ”")}
             </span>
             <span className="truncate font-mono text-[10px] text-brand-soft">
               {!pool
@@ -394,54 +523,123 @@ export default function LimitOrderForm({
                   : stateRead.error
                     ? "read failed"
                     : currentPrice !== null
-                      ? `1 ${pool.symbol0} = ${currentPrice.toLocaleString("en-US", {
-                          maximumSignificantDigits: 6,
-                        })} ${pool.symbol1}`
-                      : "—"}
+                      ? `С‚РµРєСѓС‰Р°СЏ: ${formatPrice(currentPrice)} ${pool.symbol1}`
+                      : "вЂ”"}
             </span>
           </div>
           {pool && (
             <p className="mt-2 font-mono text-[9px] text-faint">
-              fee {poolFeeLabel(pool.fee)} · tickSpacing {pool.tickSpacing}
+              fee {poolFeeLabel(pool.fee)} В· tickSpacing {pool.tickSpacing}
             </p>
           )}
         </div>
+      </div>
 
-        <div>
-          <label className="label">Tick lower</label>
-          <input
-            className="field"
-            inputMode="numeric"
-            placeholder="например -120000"
-            value={tickLower}
-            onChange={(event) => setTickLower(event.target.value)}
-            disabled={!pool}
-          />
-        </div>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        {(["lower", "upper"] as Edge[]).map((edge) => {
+          const mode = edge === "lower" ? lowerMode : upperMode;
+          const tickValue = edge === "lower" ? tickLower : tickUpper;
+          const priceValue = edge === "lower" ? priceLower : priceUpper;
+          const edgeActive = activeEdge === edge;
+          const label = edge === "lower" ? "LOWER" : "UPPER";
 
-        <div>
-          <label className="label">Tick upper</label>
-          <input
-            className="field"
-            inputMode="numeric"
-            placeholder="например -60000"
-            value={tickUpper}
-            onChange={(event) => setTickUpper(event.target.value)}
-            disabled={!pool}
-          />
+          return (
+            <div
+              key={edge}
+              className={`rounded-xl border p-3 transition-colors ${
+                edgeActive
+                  ? "border-brand/40 bg-brand/[0.04]"
+                  : "border-white/[0.08] bg-black/10"
+              }`}
+              onFocus={() => setActiveEdge(edge)}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <label className="label mb-0">{label}</label>
+                <div className="flex rounded-lg border border-white/[0.08] p-0.5">
+                  {(["price", "tick"] as InputMode[]).map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => switchMode(edge, item)}
+                      className={`rounded-md px-2 py-1 font-mono text-[8px] uppercase tracking-[0.1em] ${
+                        mode === item
+                          ? "bg-white/[0.08] text-white"
+                          : "text-faint hover:text-white"
+                      }`}
+                    >
+                      {item === "price" ? "Р¦РµРЅР°" : "Tick"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {mode === "price" ? (
+                <input
+                  className="field mt-3"
+                  inputMode="decimal"
+                  placeholder={pricePlaceholder}
+                  value={priceValue}
+                  onFocus={() => setActiveEdge(edge)}
+                  onChange={(event) => setPriceForEdge(edge, event.target.value)}
+                  disabled={!pool}
+                />
+              ) : (
+                <input
+                  className="field mt-3"
+                  inputMode="numeric"
+                  placeholder={edge === "lower" ? "-120000" : "-60000"}
+                  value={tickValue}
+                  onFocus={() => setActiveEdge(edge)}
+                  onChange={(event) => setTickForEdge(edge, event.target.value)}
+                  disabled={!pool}
+                />
+              )}
+
+              <p className="mt-2 font-mono text-[9px] text-faint">
+                {mode === "price"
+                  ? tickValue
+                    ? `tick ${tickValue}`
+                    : "вЂ”"
+                  : priceValue
+                    ? `${formatPrice(parsePrice(priceValue) ?? 0)} ${pool?.symbol1 ?? ""}`
+                    : "вЂ”"}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-4">
+        <p className="label">РџСЂРµСЃРµС‚С‹ РґР»СЏ Р°РєС‚РёРІРЅРѕР№ РіСЂР°РЅРёС†С‹ ({activeEdge.toUpperCase()})</p>
+        <div className="flex flex-wrap gap-1.5">
+          {[-10, -5, -1, 0, 1, 5, 10].map((percent) => (
+            <button
+              key={percent}
+              type="button"
+              onClick={() => applyPreset(percent)}
+              disabled={!currentPrice}
+              className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 font-mono text-[9px] text-muted transition-colors hover:border-brand/30 hover:text-white disabled:opacity-30"
+            >
+              {percent === 0 ? "С‚РµРєСѓС‰Р°СЏ" : `${percent > 0 ? "+" : ""}${percent}%`}
+            </button>
+          ))}
         </div>
+        {roundingHint && (
+          <p className="mt-2 font-mono text-[9px] text-brand-soft">{roundingHint}</p>
+        )}
+        {hint && <p className="mt-2 text-[11px] text-muted">{hint}</p>}
       </div>
 
       {pool && (stateRead.error || (currentTick === undefined && !stateRead.isLoading)) && (
         <p className="mt-4 rounded-xl border border-red-400/20 bg-red-400/[0.06] px-3 py-2 text-[11px] leading-5 text-red-200">
-          Не удалось прочитать пул {pool.poolAddress}:{" "}
+          РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ РїСѓР» {pool.poolAddress}:{" "}
           {tickReadError || "currentTick unavailable"}
         </p>
       )}
 
       {pool?.poolAddress === ZERO_ADDRESS && (
         <p className="mt-4 rounded-xl border border-amber-400/25 bg-amber-400/[0.07] px-3 py-2 text-[11px] leading-5 text-amber-200">
-          Пул для этой пары не найден. Возможно, он ещё не создан.
+          РџСѓР» РґР»СЏ СЌС‚РѕР№ РїР°СЂС‹ РЅРµ РЅР°Р№РґРµРЅ. Р’РѕР·РјРѕР¶РЅРѕ, РѕРЅ РµС‰С‘ РЅРµ СЃРѕР·РґР°РЅ.
         </p>
       )}
 
@@ -450,17 +648,16 @@ export default function LimitOrderForm({
           <div>
             <p className="label mb-1">You deposit</p>
             <p className="font-display text-xl font-semibold text-white">
-              {tokenIn?.symbol ?? "—"}
+              {tokenIn?.symbol ?? "вЂ”"}
             </p>
           </div>
           <div className="text-right">
             <p className="label mb-1">You receive</p>
             <p className="font-mono text-sm text-brand-soft">
-              {tokenOut?.symbol ?? "—"}
+              {tokenOut?.symbol ?? "вЂ”"}
             </p>
           </div>
         </div>
-        {hint && <p className="mt-3 text-[11px] text-muted">{hint}</p>}
         {expectedOut !== null && tokenOut && (
           <p className="mt-2 font-mono text-[10px] text-faint">
             Spot estimate: ~
@@ -496,7 +693,7 @@ export default function LimitOrderForm({
             onChange={(event) => setAmount(event.target.value)}
           />
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-faint">
-            {tokenIn?.symbol ?? "—"}
+            {tokenIn?.symbol ?? "вЂ”"}
           </span>
         </div>
         {tokenIn && (
@@ -543,8 +740,8 @@ export default function LimitOrderForm({
       </div>
 
       <p className="mt-3 text-center text-[10px] leading-5 text-faint">
-        Позиция создаётся только вне текущего диапазона. Контракт не выполняет
-        внутренний swap.
+        РџРѕР·РёС†РёСЏ СЃРѕР·РґР°С‘С‚СЃСЏ С‚РѕР»СЊРєРѕ РІРЅРµ С‚РµРєСѓС‰РµРіРѕ РґРёР°РїР°Р·РѕРЅР°. РљРѕРЅС‚СЂР°РєС‚ РЅРµ РІС‹РїРѕР»РЅСЏРµС‚
+        РІРЅСѓС‚СЂРµРЅРЅРёР№ swap.
       </p>
     </div>
   );
