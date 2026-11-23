@@ -71,6 +71,82 @@ export const COINGECKO_IDS: Record<string, string> = {
   USDC: process.env.NEXT_PUBLIC_COINGECKO_IDS_USDC || "usd-coin",
 };
 
+export type SeedPool = {
+  token0: Address;
+  token1: Address;
+  symbol0: string;
+  symbol1: string;
+  decimals0: number;
+  decimals1: number;
+  fee: number;
+  poolAddress?: Address;
+  tickSpacing?: number;
+};
+
+/**
+ * Fast-start pairs with verified Fuse token addresses.
+ * Unknown-token pairs from the screenshot are intentionally omitted rather
+ * than inventing addresses; the Factory scan discovers them.
+ */
+export const SEED_POOLS: SeedPool[] = [
+  {
+    token0: "0x0BE9e53fd7EDaC9F859882AfdDa116645287C629",
+    token1: "0xFaDbBF8Ce7D5b7041bE672561bbA99f79c532e10",
+    symbol0: "WFUSE",
+    symbol1: "USDT",
+    decimals0: 18,
+    decimals1: 6,
+    fee: 8048,
+  },
+  {
+    token0: "0xFaDbBF8Ce7D5b7041bE672561bbA99f79c532e10",
+    token1: "0x620fd5fa44BE6af63715Ef4E65DDFA0387aD13F5",
+    symbol0: "USDT",
+    symbol1: "USDC",
+    decimals0: 6,
+    decimals1: 6,
+    fee: 100,
+  },
+  {
+    token0: "0x0BE9e53fd7EDaC9F859882AfdDa116645287C629",
+    token1: "0x34Ef2Cc892a88415e9f02b91BfA9c91fC0bE6bD4",
+    symbol0: "WFUSE",
+    symbol1: "VOLT",
+    decimals0: 18,
+    decimals1: 18,
+    fee: 279,
+    poolAddress: "0x57827c76d7749961EF41e7918dd9f8CfDfc7d28D",
+    tickSpacing: 60,
+  },
+  {
+    token0: "0xa722c13135930332Eb3d749B2F0906559D2C5b99",
+    token1: "0xFaDbBF8Ce7D5b7041bE672561bbA99f79c532e10",
+    symbol0: "WETH",
+    symbol1: "USDT",
+    decimals0: 18,
+    decimals1: 6,
+    fee: 3048,
+  },
+  {
+    token0: "0x94Ba7A27c7A95863d1bdC7645AC2951E0cca06bA",
+    token1: "0xFaDbBF8Ce7D5b7041bE672561bbA99f79c532e10",
+    symbol0: "DAI",
+    symbol1: "USDT",
+    decimals0: 18,
+    decimals1: 6,
+    fee: 100,
+  },
+  {
+    token0: "0xa722c13135930332Eb3d749B2F0906559D2C5b99",
+    token1: "0x33284f95ccb7B948d9D352e1439561CF83d8d00d",
+    symbol0: "WETH",
+    symbol1: "WBTC",
+    decimals0: 18,
+    decimals1: 8,
+    fee: 100,
+  },
+];
+
 export type VaultConfig = {
   id: string;
   name: string;
