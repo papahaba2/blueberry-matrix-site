@@ -47,22 +47,22 @@ function mapContractError(error: unknown, symbol0: string, symbol1: string): str
   const raw = error instanceof Error ? error.message : String(error);
 
   if (raw.includes("Order must be created out-of-range")) {
-    return "Р”РёР°РїР°Р·РѕРЅ РѕСЂРґРµСЂР° РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РІС‹С€Рµ РёР»Рё РЅРёР¶Рµ С‚РµРєСѓС‰РµР№ С†РµРЅС‹.";
+    return "Диапазон ордера должен быть выше или ниже текущей цены.";
   }
   if (raw.includes("tokenIn must be token0")) {
-    return `Р”Р»СЏ РІС‹Р±СЂР°РЅРЅРѕРіРѕ РґРёР°РїР°Р·РѕРЅР° РЅРµРѕР±С…РѕРґРёРјРѕ РІРЅРѕСЃРёС‚СЊ ${symbol0}.`;
+    return `Для выбранного диапазона необходимо вносить ${symbol0}.`;
   }
   if (raw.includes("tokenIn must be token1")) {
-    return `Р”Р»СЏ РІС‹Р±СЂР°РЅРЅРѕРіРѕ РґРёР°РїР°Р·РѕРЅР° РЅРµРѕР±С…РѕРґРёРјРѕ РІРЅРѕСЃРёС‚СЊ ${symbol1}.`;
+    return `Для выбранного диапазона необходимо вносить ${symbol1}.`;
   }
   if (raw.includes("not executable")) {
-    return "РћСЂРґРµСЂ РµС‰С‘ РЅРµ РґРѕСЃС‚РёРі С†РµР»РµРІРѕР№ С†РµРЅС‹.";
+    return "Ордер ещё не достиг целевой цены.";
   }
   if (raw.includes("User rejected") || raw.includes("user rejected")) {
-    return "РўСЂР°РЅР·Р°РєС†РёСЏ РѕС‚РєР»РѕРЅРµРЅР° РІ РєРѕС€РµР»СЊРєРµ.";
+    return "Транзакция отклонена в кошельке.";
   }
   if (raw.includes("no pool")) {
-    return "Р”Р»СЏ СЌС‚РѕР№ РїР°СЂС‹ РЅРµС‚ РїСѓР»Р° Algebra РЅР° Fuse.";
+    return "Для этой пары нет пула Algebra на Fuse.";
   }
 
   return raw.length > 180 ? `${raw.slice(0, 177)}...` : raw;
@@ -235,14 +235,14 @@ export default function LimitOrderForm({
   useEffect(() => {
     if (approveReceipt.isSuccess) {
       void allowanceRead.refetch();
-      setSuccess("Approval РїРѕРґС‚РІРµСЂР¶РґС‘РЅ. РўРµРїРµСЂСЊ РјРѕР¶РЅРѕ СЃРѕР·РґР°С‚СЊ Р»РёРјРёС‚РЅС‹Р№ РѕСЂРґРµСЂ.");
+      setSuccess("Approval подтверждён. Теперь можно создать лимитный ордер.");
       setError("");
     }
   }, [approveReceipt.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (createReceipt.isSuccess) {
-      setSuccess("Р›РёРјРёС‚РЅС‹Р№ РѕСЂРґРµСЂ СЃРѕР·РґР°РЅ. Keeper РёСЃРїРѕР»РЅРёС‚ РµРіРѕ РїРѕСЃР»Рµ РІС‹С…РѕРґР° С†РµРЅС‹ РёР· РґРёР°РїР°Р·РѕРЅР°.");
+      setSuccess("Лимитный ордер создан. Keeper исполнит его после выхода цены из диапазона.");
       setError("");
       setAmount("");
       setCreateHash(undefined);
@@ -268,7 +268,7 @@ export default function LimitOrderForm({
     if (price > 0) {
       if (edge === "lower") setPriceLower(priceInputValue(price));
       else setPriceUpper(priceInputValue(price));
-      setRoundingHint(`в‰€ ${formatPrice(price)} ${pool.symbol1}`);
+      setRoundingHint(`≈ ${formatPrice(price)} ${pool.symbol1}`);
     }
   };
 
@@ -293,10 +293,10 @@ export default function LimitOrderForm({
       if (edge === "lower") setTickLower(String(rounded));
       else setTickUpper(String(rounded));
       setRoundingHint(
-        `в‰€ tick ${rounded}${rounded !== rawTick ? `, РѕРєСЂСѓРіР»РµРЅРѕ РґРѕ С€Р°РіР° ${pool.tickSpacing}` : ""}`,
+        `≈ tick ${rounded}${rounded !== rawTick ? `, округлено до шага ${pool.tickSpacing}` : ""}`,
       );
     } catch {
-      setRoundingHint("Р’РІРµРґРёС‚Рµ РїРѕР»РѕР¶РёС‚РµР»СЊРЅСѓСЋ С†РµРЅСѓ.");
+      setRoundingHint("Введите положительную цену.");
     }
   };
 
@@ -348,52 +348,52 @@ export default function LimitOrderForm({
 
   const validationError = useMemo(() => {
     if (!isManagerConfigured()) {
-      return "РђРґСЂРµСЃ V4LimitOrderManager РЅРµ РЅР°СЃС‚СЂРѕРµРЅ РІ NEXT_PUBLIC_LIMIT_ORDER_MANAGER_ADDRESS.";
+      return "Адрес V4LimitOrderManager не настроен в NEXT_PUBLIC_LIMIT_ORDER_MANAGER_ADDRESS.";
     }
     if (!isConnected || !account) {
-      return "РџРѕРґРєР»СЋС‡РёС‚Рµ РєРѕС€РµР»С‘Рє, С‡С‚РѕР±С‹ СЃРѕР·РґР°С‚СЊ Р»РёРјРёС‚РЅС‹Р№ РѕСЂРґРµСЂ.";
+      return "Подключите кошелёк, чтобы создать лимитный ордер.";
     }
     if (!pool || !token0 || !token1) {
-      return "Р’С‹Р±РµСЂРёС‚Рµ РїСѓР» РёР· СЃРїРёСЃРєР°.";
+      return "Выберите пул из списка.";
     }
     if (pool.poolAddress === ZERO_ADDRESS) {
-      return "РџСѓР» РґР»СЏ СЌС‚РѕР№ РїР°СЂС‹ РЅРµ РЅР°Р№РґРµРЅ. Р’РѕР·РјРѕР¶РЅРѕ, РѕРЅ РµС‰С‘ РЅРµ СЃРѕР·РґР°РЅ.";
+      return "Пул для этой пары не найден. Возможно, он ещё не создан.";
     }
     if (stateRead.isLoading) {
-      return "Р—Р°РіСЂСѓР¶Р°РµРј С‚РµРєСѓС‰СѓСЋ С†РµРЅСѓ РїСѓР»Р°...";
+      return "Загружаем текущую цену пула...";
     }
     if (stateRead.error) {
-      return `РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ РїСѓР» ${pool.poolAddress}: ${tickReadError}`;
+      return `Не удалось прочитать пул ${pool.poolAddress}: ${tickReadError}`;
     }
     if (currentTick === undefined) {
-      return "РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ currentTick РїСѓР»Р°.";
+      return "Не удалось прочитать currentTick пула.";
     }
     if (!tickLower.trim() || !tickUpper.trim()) {
-      return "Р’РІРµРґРёС‚Рµ С†РµРЅСѓ РёР»Рё С‚РёРє РґР»СЏ РѕР±РµРёС… РіСЂР°РЅРёС†.";
+      return "Введите цену или тик для обеих границ.";
     }
     if (!integerTicks) {
-      return "РўРёРєРё РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ С†РµР»С‹РјРё С‡РёСЃР»Р°РјРё.";
+      return "Тики должны быть целыми числами.";
     }
     if (lower === upper) {
-      return "Р”РёР°РїР°Р·РѕРЅ СЃР»РёС€РєРѕРј СѓР·РєРёР№: РїРѕСЃР»Рµ РѕРєСЂСѓРіР»РµРЅРёСЏ РіСЂР°РЅРёС†С‹ СЃРѕРІРїР°Р»Рё.";
+      return "Диапазон слишком узкий: после округления границы совпали.";
     }
     if (!Number.isFinite(lower) || !Number.isFinite(upper) || lower >= upper) {
-      return "РќРёР¶РЅСЏСЏ РіСЂР°РЅРёС†Р° РґРѕР»Р¶РЅР° Р±С‹С‚СЊ РјРµРЅСЊС€Рµ РІРµСЂС…РЅРµР№.";
+      return "Нижняя граница должна быть меньше верхней.";
     }
     if (!spacingValid) {
-      return `РўРёРєРё РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ РєСЂР°С‚РЅС‹ tickSpacing ${tickSpacing}. Р‘Р»РёР¶Р°Р№С€РёРµ Р·РЅР°С‡РµРЅРёСЏ: ${nearestLower} Рё ${nearestUpper}.`;
+      return `Тики должны быть кратны tickSpacing ${tickSpacing}. Ближайшие значения: ${nearestLower} и ${nearestUpper}.`;
     }
     if (rangeState === "in-range") {
-      return "Р›РёРјРёС‚РЅС‹Р№ РѕСЂРґРµСЂ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РІРЅРµ С‚РµРєСѓС‰РµРіРѕ РґРёР°РїР°Р·РѕРЅР°. Р”Р»СЏ РІС…РѕРґР° РїРѕ СЂС‹РЅРѕС‡РЅРѕР№ С†РµРЅРµ РёСЃРїРѕР»СЊР·СѓР№С‚Рµ РѕР±С‹С‡РЅС‹Р№ Swap.";
+      return "Лимитный ордер должен быть вне текущего диапазона. Для входа по рыночной цене используйте обычный Swap.";
     }
     if (!tokenIn || !tokenOut) {
-      return "Р’С‹Р±РµСЂРёС‚Рµ РґРёР°РїР°Р·РѕРЅ РІС‹С€Рµ РёР»Рё РЅРёР¶Рµ С‚РµРєСѓС‰РµР№ С†РµРЅС‹.";
+      return "Выберите диапазон выше или ниже текущей цены.";
     }
     if (!amountIn) {
-      return `Р’РІРµРґРёС‚Рµ СЃСѓРјРјСѓ РІ ${tokenIn.symbol}.`;
+      return `Введите сумму в ${tokenIn.symbol}.`;
     }
     if (amountIn > balance) {
-      return `РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ ${tokenIn.symbol} РІ РєРѕС€РµР»СЊРєРµ.`;
+      return `Недостаточно ${tokenIn.symbol} в кошельке.`;
     }
     return "";
   }, [
@@ -461,14 +461,14 @@ export default function LimitOrderForm({
     !pool || currentTick === undefined || Boolean(validationError) || busy;
   const hint =
     rangeState === "above"
-      ? `Р’С‹С€Рµ С‚РµРєСѓС‰РµР№ С†РµРЅС‹ в†’ РґРµРїРѕР·РёС‚ ${token0?.symbol}`
+      ? `Выше текущей цены → депозит ${token0?.symbol}`
       : rangeState === "below"
-        ? `РќРёР¶Рµ С‚РµРєСѓС‰РµР№ С†РµРЅС‹ в†’ РґРµРїРѕР·РёС‚ ${token1?.symbol}`
+        ? `Ниже текущей цены → депозит ${token1?.symbol}`
         : "";
 
   const pricePlaceholder = pool
-    ? `1 ${pool.symbol0} = вЂ¦ ${pool.symbol1}`
-    : "1 TOKEN0 = вЂ¦ TOKEN1";
+    ? `1 ${pool.symbol0} = … ${pool.symbol1}`
+    : "1 TOKEN0 = … TOKEN1";
 
   return (
     <div className="glass rounded-2xl p-4 md:p-6">
@@ -508,12 +508,12 @@ export default function LimitOrderForm({
           <div className="field flex items-center justify-between gap-3 text-muted">
             <span>
               {!pool
-                ? "вЂ”"
+                ? "—"
                 : stateRead.isLoading
-                  ? "loadingвЂ¦"
+                  ? "loading…"
                   : stateRead.error
                     ? "error"
-                    : (currentTick ?? "вЂ”")}
+                    : (currentTick ?? "—")}
             </span>
             <span className="truncate font-mono text-[10px] text-brand-soft">
               {!pool
@@ -523,13 +523,13 @@ export default function LimitOrderForm({
                   : stateRead.error
                     ? "read failed"
                     : currentPrice !== null
-                      ? `С‚РµРєСѓС‰Р°СЏ: ${formatPrice(currentPrice)} ${pool.symbol1}`
-                      : "вЂ”"}
+                      ? `текущая: ${formatPrice(currentPrice)} ${pool.symbol1}`
+                      : "—"}
             </span>
           </div>
           {pool && (
             <p className="mt-2 font-mono text-[9px] text-faint">
-              fee {poolFeeLabel(pool.fee)} В· tickSpacing {pool.tickSpacing}
+              fee {poolFeeLabel(pool.fee)} · tickSpacing {pool.tickSpacing}
             </p>
           )}
         </div>
@@ -567,7 +567,7 @@ export default function LimitOrderForm({
                           : "text-faint hover:text-white"
                       }`}
                     >
-                      {item === "price" ? "Р¦РµРЅР°" : "Tick"}
+                      {item === "price" ? "Цена" : "Tick"}
                     </button>
                   ))}
                 </div>
@@ -599,10 +599,10 @@ export default function LimitOrderForm({
                 {mode === "price"
                   ? tickValue
                     ? `tick ${tickValue}`
-                    : "вЂ”"
+                    : "—"
                   : priceValue
                     ? `${formatPrice(parsePrice(priceValue) ?? 0)} ${pool?.symbol1 ?? ""}`
-                    : "вЂ”"}
+                    : "—"}
               </p>
             </div>
           );
@@ -610,7 +610,7 @@ export default function LimitOrderForm({
       </div>
 
       <div className="mt-4">
-        <p className="label">РџСЂРµСЃРµС‚С‹ РґР»СЏ Р°РєС‚РёРІРЅРѕР№ РіСЂР°РЅРёС†С‹ ({activeEdge.toUpperCase()})</p>
+        <p className="label">Пресеты для активной границы ({activeEdge.toUpperCase()})</p>
         <div className="flex flex-wrap gap-1.5">
           {[-10, -5, -1, 0, 1, 5, 10].map((percent) => (
             <button
@@ -620,7 +620,7 @@ export default function LimitOrderForm({
               disabled={!currentPrice}
               className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 font-mono text-[9px] text-muted transition-colors hover:border-brand/30 hover:text-white disabled:opacity-30"
             >
-              {percent === 0 ? "С‚РµРєСѓС‰Р°СЏ" : `${percent > 0 ? "+" : ""}${percent}%`}
+              {percent === 0 ? "текущая" : `${percent > 0 ? "+" : ""}${percent}%`}
             </button>
           ))}
         </div>
@@ -632,14 +632,14 @@ export default function LimitOrderForm({
 
       {pool && (stateRead.error || (currentTick === undefined && !stateRead.isLoading)) && (
         <p className="mt-4 rounded-xl border border-red-400/20 bg-red-400/[0.06] px-3 py-2 text-[11px] leading-5 text-red-200">
-          РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ РїСѓР» {pool.poolAddress}:{" "}
+          Не удалось прочитать пул {pool.poolAddress}:{" "}
           {tickReadError || "currentTick unavailable"}
         </p>
       )}
 
       {pool?.poolAddress === ZERO_ADDRESS && (
         <p className="mt-4 rounded-xl border border-amber-400/25 bg-amber-400/[0.07] px-3 py-2 text-[11px] leading-5 text-amber-200">
-          РџСѓР» РґР»СЏ СЌС‚РѕР№ РїР°СЂС‹ РЅРµ РЅР°Р№РґРµРЅ. Р’РѕР·РјРѕР¶РЅРѕ, РѕРЅ РµС‰С‘ РЅРµ СЃРѕР·РґР°РЅ.
+          Пул для этой пары не найден. Возможно, он ещё не создан.
         </p>
       )}
 
@@ -648,13 +648,13 @@ export default function LimitOrderForm({
           <div>
             <p className="label mb-1">You deposit</p>
             <p className="font-display text-xl font-semibold text-white">
-              {tokenIn?.symbol ?? "вЂ”"}
+              {tokenIn?.symbol ?? "—"}
             </p>
           </div>
           <div className="text-right">
             <p className="label mb-1">You receive</p>
             <p className="font-mono text-sm text-brand-soft">
-              {tokenOut?.symbol ?? "вЂ”"}
+              {tokenOut?.symbol ?? "—"}
             </p>
           </div>
         </div>
@@ -693,7 +693,7 @@ export default function LimitOrderForm({
             onChange={(event) => setAmount(event.target.value)}
           />
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-faint">
-            {tokenIn?.symbol ?? "вЂ”"}
+            {tokenIn?.symbol ?? "—"}
           </span>
         </div>
         {tokenIn && (
@@ -740,8 +740,8 @@ export default function LimitOrderForm({
       </div>
 
       <p className="mt-3 text-center text-[10px] leading-5 text-faint">
-        РџРѕР·РёС†РёСЏ СЃРѕР·РґР°С‘С‚СЃСЏ С‚РѕР»СЊРєРѕ РІРЅРµ С‚РµРєСѓС‰РµРіРѕ РґРёР°РїР°Р·РѕРЅР°. РљРѕРЅС‚СЂР°РєС‚ РЅРµ РІС‹РїРѕР»РЅСЏРµС‚
-        РІРЅСѓС‚СЂРµРЅРЅРёР№ swap.
+        Позиция создаётся только вне текущего диапазона. Контракт не выполняет
+        внутренний swap.
       </p>
     </div>
   );
