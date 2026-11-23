@@ -20,6 +20,7 @@ import {
   tokenByAddress,
   type VaultConfig,
 } from "@/config";
+import { useUsdPrices } from "@/utils/priceFeed";
 
 const THIRTY_SECONDS = 30_000;
 
@@ -29,7 +30,7 @@ export type VaultData = {
   totalSupply: bigint;
   userShares: bigint;
   userAssets: bigint;
-  tvlUsd: number;
+  tvlUsd: number | null;
   pricePerShare: number;
 };
 
@@ -49,7 +50,7 @@ export type ProtocolOrder = {
 type VaultCall = {
   address: Address;
   abi: typeof VAULT_ABI;
-  functionName: "totalAssets" | "totalSupply" | "balanceOf";
+  functionName: "asset" | "totalAssets" | "totalSupply" | "balanceOf";
   args?: readonly [Address];
 };
 
@@ -66,6 +67,12 @@ function numberValue(value: unknown): number {
 export function useProtocolData() {
   const { address: account } = useAccount();
   const publicClient = usePublicClient();
+  const {
+    prices,
+    ts: priceTs,
+    stale: priceStale,
+    loading: pricesLoading,
+  } = useUsdPrices(["WFUSE", "USDC"]);
 
   const [executedCount, setExecutedCount] = useState<number | null>(null);
   const [executedLoading, setExecutedLoading] = useState(false);
@@ -73,6 +80,11 @@ export function useProtocolData() {
   const vaultCalls = useMemo<VaultCall[]>(
     () =>
       VAULTS.flatMap((vault) => [
+        {
+          address: vault.address,
+          abi: VAULT_ABI,
+          functionName: "asset" as const,
+        },
         {
           address: vault.address,
           abi: VAULT_ABI,
@@ -160,14 +172,21 @@ export function useProtocolData() {
   const vaults = useMemo<VaultData[]>(
     () =>
       VAULTS.map((config, index) => {
+        const onchainAsset = vaultReads.data?.[index * 4]?.result;
+        const assetAddress =
+          typeof onchainAsset === "string"
+            ? (onchainAsset as Address)
+            : config.asset.address;
+        const asset = tokenByAddress(assetAddress) ?? config.asset;
+
         const totalAssets = bigintValue(
-          vaultReads.data?.[index * 3]?.result,
+          vaultReads.data?.[index * 4 + 1]?.result,
         );
         const totalSupply = bigintValue(
-          vaultReads.data?.[index * 3 + 1]?.result,
+          vaultReads.data?.[index * 4 + 2]?.result,
         );
         const userShares = bigintValue(
-          vaultReads.data?.[index * 3 + 2]?.result,
+          vaultReads.data?.[index * 4 + 3]?.result,
         );
         const pricePerShare =
           totalSupply > 0n
@@ -175,20 +194,24 @@ export function useProtocolData() {
             : 0;
         const userAssets = BigInt(Math.floor(Number(userShares) * pricePerShare));
         const assetAmount = Number(
-          totalAssets / 10n ** BigInt(config.asset.decimals),
+          totalAssets / 10n ** BigInt(asset.decimals),
         );
+        const price = prices[asset.symbol.toUpperCase()];
 
         return {
-          config,
+          config: { ...config, asset },
           totalAssets,
           totalSupply,
           userShares,
           userAssets,
-          tvlUsd: assetAmount * config.priceUsd,
+          tvlUsd:
+            typeof price === "number" && Number.isFinite(price)
+              ? assetAmount * price
+              : null,
           pricePerShare,
         };
       }),
-    [vaultReads.data],
+    [prices, vaultReads.data],
   );
 
   const orders = useMemo<ProtocolOrder[]>(
@@ -233,16 +256,21 @@ export function useProtocolData() {
     () =>
       orders.reduce((sum, order) => {
         const token = tokenByAddress(order.tokenIn);
-        if (!token?.priceUsd) return sum;
+        if (!token) return sum;
+        const price = prices[token.symbol.toUpperCase()];
+        if (typeof price !== "number" || !Number.isFinite(price)) return sum;
         const amount = Number(
           order.amountIn / 10n ** BigInt(token.decimals),
         );
-        return sum + amount * token.priceUsd;
+        return sum + amount * price;
       }, 0),
-    [orders],
+    [orders, prices],
   );
 
-  const totalVaultTvlUsd = vaults.reduce((sum, vault) => sum + vault.tvlUsd, 0);
+  const totalVaultTvlUsd = vaults.reduce(
+    (sum, vault) => sum + (vault.tvlUsd ?? 0),
+    0,
+  );
   const totalTvlUsd = totalVaultTvlUsd + lockedUsd;
 
   useEffect(() => {
@@ -300,6 +328,10 @@ export function useProtocolData() {
     activeOrdersCount: activeIds.length,
     executedCount,
     executedLoading,
+    prices,
+    priceTs,
+    priceStale,
+    pricesLoading,
     isLoading:
       vaultReads.isLoading ||
       activeIdsRead.isLoading ||
