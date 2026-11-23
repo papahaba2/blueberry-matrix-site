@@ -12,7 +12,15 @@ function formatUsd(value: number) {
 }
 
 export default function VaultPage() {
-  const { vaults, totalVaultTvlUsd, isLoading, refetch } = useProtocolData();
+  const {
+    vaults,
+    totalVaultTvlUsd,
+    isLoading,
+    refetch,
+    priceTs,
+    priceStale,
+    pricesLoading,
+  } = useProtocolData();
 
   return (
     <div className="page-shell py-10 md:py-16">
@@ -35,7 +43,18 @@ export default function VaultPage() {
         <div className="glass rounded-2xl p-4">
           <p className="label">Combined vault TVL</p>
           <p className="mt-2 font-mono text-xl text-white">
-            {isLoading ? "—" : formatUsd(totalVaultTvlUsd)}
+            {isLoading || pricesLoading
+              ? "—"
+              : vaults.some((vault) => vault.tvlUsd === null)
+                ? "—"
+                : formatUsd(totalVaultTvlUsd)}
+          </p>
+          <p className="mt-1 font-mono text-[9px] text-faint">
+            {vaults.some((vault) => vault.tvlUsd === null)
+              ? "часть цен недоступна"
+              : priceTs
+                ? new Date(priceTs).toLocaleString("ru-RU")
+                : "—"}
           </p>
         </div>
         <div className="glass rounded-2xl p-4">
@@ -57,7 +76,14 @@ export default function VaultPage() {
               />
             ))
           : vaults.map((vault) => (
-              <VaultCard key={vault.config.id} data={vault} onSuccess={refetch} />
+              <VaultCard
+                key={vault.config.id}
+                data={vault}
+                onSuccess={refetch}
+                priceTs={priceTs}
+                priceStale={priceStale}
+                priceLoading={pricesLoading}
+              />
             ))}
       </div>
     </div>
