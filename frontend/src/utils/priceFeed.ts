@@ -162,7 +162,19 @@ export function useUsdPrices(symbols: string[]): UsdPricesState {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  return state;
+  const symbolPrices = useMemo(() => {
+    const mapped: Record<string, number> = {};
+    for (const symbol of symbols) {
+      const normalized = symbol.toUpperCase();
+      const id = COINGECKO_IDS[normalized];
+      const value = id ? state.prices[id] : undefined;
+      if (typeof value === "number") mapped[normalized] = value;
+    }
+    return mapped;
+    // state.prices is the id-keyed cache result.
+  }, [state.prices, symbols]);
+
+  return { ...state, prices: symbolPrices };
 }
 
 export function useUsdPrice(symbol: string): {
@@ -172,9 +184,8 @@ export function useUsdPrice(symbol: string): {
   loading: boolean;
 } {
   const state = useUsdPrices([symbol]);
-  const id = COINGECKO_IDS[symbol.toUpperCase()];
   return {
-    price: id ? (state.prices[id] ?? null) : null,
+    price: state.prices[symbol.toUpperCase()] ?? null,
     ts: state.ts,
     stale: state.stale,
     loading: state.loading,
