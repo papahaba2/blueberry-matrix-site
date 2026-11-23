@@ -64,6 +64,13 @@ export const TOKENS = {
   },
 } as const satisfies Record<string, Token>;
 
+export const COINGECKO_IDS: Record<string, string> = {
+  // WFUSE is wrapped FUSE; CoinGecko prices the native token under this id.
+  WFUSE:
+    process.env.NEXT_PUBLIC_COINGECKO_IDS_WFUSE || "fuse-network-token",
+  USDC: process.env.NEXT_PUBLIC_COINGECKO_IDS_USDC || "usd-coin",
+};
+
 export type VaultConfig = {
   id: string;
   name: string;
