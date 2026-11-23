@@ -19,11 +19,14 @@ function shortAddress(address: string): string {
 
 export default function PairSearch({
   onSelect,
+  refreshToken = 0,
 }: {
   onSelect: (pool: PoolInfo) => void;
+  refreshToken?: number;
 }) {
   const [pools, setPools] = useState<PoolInfo[]>([]);
   const [query, setQuery] = useState("");
+  const [selectedAddress, setSelectedAddress] = useState("");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -47,6 +50,17 @@ export default function PairSearch({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (refreshToken > 0) {
+      setSelectedAddress("");
+      setQuery("");
+      setLoaded(false);
+      void load(true);
+    }
+    // load is intentionally recreated from current component state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshToken]);
 
   useEffect(() => {
     const onDocumentClick = (event: MouseEvent) => {
@@ -75,13 +89,16 @@ export default function PairSearch({
   }, [pools, query]);
 
   const select = (pool: PoolInfo) => {
-    setQuery(pool.name);
+    setSelectedAddress(pool.poolAddress);
+    setQuery(`${pool.name} · ${poolFeeLabel(pool.fee)}`);
     setOpen(false);
+    console.log("[pool] selected", pool.poolAddress, pool.name, pool.fee, pool.tickSpacing);
     onSelect(pool);
   };
 
   return (
-    <div ref={wrapperRef} className="relative">
+    <div ref={wrapperRef} className="relative" data-selected-pool={selectedAddress}>
+      <input type="hidden" name="poolAddress" value={selectedAddress} readOnly />
       <div className="flex gap-2">
         <div className="relative min-w-0 flex-1">
           <input
@@ -158,7 +175,7 @@ export default function PairSearch({
                   </span>
                 </span>
                 <span className="shrink-0 rounded-md border border-white/[0.08] px-1.5 py-1 font-mono text-[8px] text-muted">
-                  {poolFeeLabel(pool.fee)}
+                  {poolFeeLabel(pool.fee)} · {pool.tickSpacing}
                 </span>
               </button>
             ))}
