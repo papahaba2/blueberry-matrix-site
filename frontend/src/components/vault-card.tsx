@@ -19,9 +19,15 @@ function formatUsd(value: number) {
 export default function VaultCard({
   data,
   onSuccess,
+  priceTs,
+  priceStale,
+  priceLoading,
 }: {
   data: VaultData;
   onSuccess: () => void;
+  priceTs: number | null;
+  priceStale: boolean;
+  priceLoading: boolean;
 }) {
   const { isConnected } = useAccount();
   const [depositOpen, setDepositOpen] = useState(false);
@@ -50,7 +56,16 @@ export default function VaultCard({
           <div>
             <p className="label">TVL</p>
             <p className="font-mono text-lg text-white">
-              {formatUsd(data.tvlUsd)}
+              {data.tvlUsd === null ? "—" : formatUsd(data.tvlUsd)}
+            </p>
+            <p className="mt-1 font-mono text-[9px] text-faint">
+              {priceLoading
+                ? "загружаем цену…"
+                : data.tvlUsd === null
+                  ? "цена недоступна"
+                  : priceTs
+                    ? `${new Date(priceTs).toLocaleString("ru-RU")}${priceStale ? " · stale" : ""}`
+                    : "—"}
             </p>
           </div>
           <div>
