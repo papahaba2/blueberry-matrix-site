@@ -7,12 +7,23 @@ import {
 } from "ethers";
 import { CONTRACTS } from "@/config";
 
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://rpc.fuse.io/";
+const RPC_URLS = Array.from(
+  new Set(
+    [
+      process.env.NEXT_PUBLIC_RPC_URL,
+      "https://rpc.fuse.io/",
+      "https://fuse.drpc.org",
+      "https://122.rpc.thirdweb.com",
+    ].filter((url): url is string => Boolean(url)),
+  ),
+);
+
 const FACTORY_DEPLOY_BLOCK = Number(
   process.env.NEXT_PUBLIC_ALGEBRA_FACTORY_DEPLOY_BLOCK || "32498119",
 );
-const BLOCK_CHUNK = 50_000;
-const CACHE_KEY = "blueberry:algebra-pools:v3";
+const BLOCK_CHUNK = 5_000;
+const MIN_BLOCK_CHUNK = 100;
+const CACHE_KEY = "blueberry:algebra-pools:v4";
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 export type PoolInfo = {
@@ -33,8 +44,6 @@ type CachePayload = {
   pools: PoolInfo[];
 };
 
-// The V4 factory emits `Pool` for default pools and `CustomPool` for custom
-// pools. It does not emit a `PoolCreated` event.
 const factoryInterface = new Interface([
   "event Pool(address indexed token0, address indexed token1, address pool)",
   "event CustomPool(address indexed deployer, address indexed token0, address indexed token1, address pool)",
@@ -52,13 +61,59 @@ const tokenAbi = [
   "function decimals() view returns (uint8)",
 ];
 
-let provider: JsonRpcProvider | undefined;
+const providers = RPC_URLS.map(
+  (url) => new JsonRpcProvider(url, 122, { staticNetwork: true }),
+);
+let providerIndex = 0;
+let hadRpcError = false;
 
 function getProvider(): JsonRpcProvider {
-  if (!provider) {
-    provider = new JsonRpcProvider(RPC_URL, 122, { staticNetwork: true });
+  return providers[providerIndex % providers.length];
+}
+
+function nextProvider(): boolean {
+  if (providers.length <= 1) return false;
+  if (providerIndex >= providers.length - 1) return false;
+  providerIndex += 1;
+  return true;
+}
+
+async function getLogsSegment(fromBlock: number, toBlock: number): Promise<Log[]> {
+  const provider = getProvider();
+  try {
+    return await provider.getLogs({
+      address: CONTRACTS.factory,
+      fromBlock,
+      toBlock,
+      topics: [
+        [
+          factoryInterface.getEvent("Pool")!.topicHash,
+          factoryInterface.getEvent("CustomPool")!.topicHash,
+        ],
+      ],
+    });
+  } catch (error) {
+    // Public Fuse RPCs often reject wide ranges. Halve until 100 blocks.
+    if (toBlock - fromBlock > MIN_BLOCK_CHUNK) {
+      const middle = Math.floor((fromBlock + toBlock) / 2);
+      const left = await getLogsSegment(fromBlock, middle);
+      const right = await getLogsSegment(middle + 1, toBlock);
+      return [...left, ...right];
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[pools] getLogs failed ${fromBlock}-${toBlock} on ${RPC_URLS[providerIndex]}: ${message}`,
+    );
+    hadRpcError = true;
+
+    // One more attempt on the next RPC for this small segment.
+    if (nextProvider()) {
+      return getLogsSegment(fromBlock, toBlock);
+    }
+
+    return [];
   }
-  return provider;
 }
 
 function readCache(): PoolInfo[] | null {
@@ -70,7 +125,8 @@ function readCache(): PoolInfo[] | null {
     if (
       !parsed?.timestamp ||
       Date.now() - parsed.timestamp > CACHE_TTL_MS ||
-      !Array.isArray(parsed.pools)
+      !Array.isArray(parsed.pools) ||
+      parsed.pools.length === 0
     ) {
       return null;
     }
@@ -81,7 +137,7 @@ function readCache(): PoolInfo[] | null {
 }
 
 function writeCache(pools: PoolInfo[]): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || pools.length === 0) return;
   try {
     const payload: CachePayload = { timestamp: Date.now(), pools };
     window.localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
@@ -98,8 +154,7 @@ async function inBatches<T, R>(
   const output: R[] = [];
   for (let index = 0; index < items.length; index += size) {
     const batch = items.slice(index, index + size);
-    const values = await Promise.all(batch.map(fn));
-    output.push(...values);
+    output.push(...(await Promise.all(batch.map(fn))));
   }
   return output;
 }
@@ -124,18 +179,34 @@ async function tokenMetadata(
   }
 }
 
+async function latestBlock(): Promise<number> {
+  let lastError: unknown;
+  for (let index = 0; index < providers.length; index += 1) {
+    try {
+      return await providers[(providerIndex + index) % providers.length].getBlockNumber();
+    } catch (error) {
+      lastError = error;
+      hadRpcError = true;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("no RPC available");
+}
+
 export async function getAllPools(forceRefresh = false): Promise<PoolInfo[]> {
   if (typeof window === "undefined") return [];
 
-  if (!forceRefresh) {
+  if (forceRefresh) {
+    window.localStorage.removeItem(CACHE_KEY);
+  } else {
     const cached = readCache();
     if (cached) return cached;
   }
 
-  const rpc = getProvider();
+  hadRpcError = false;
+  providerIndex = 0;
 
   try {
-    const latest = await rpc.getBlockNumber();
+    const latest = await latestBlock();
     const poolAddresses = new Set<string>();
 
     for (
@@ -144,61 +215,51 @@ export async function getAllPools(forceRefresh = false): Promise<PoolInfo[]> {
       fromBlock += BLOCK_CHUNK
     ) {
       const toBlock = Math.min(fromBlock + BLOCK_CHUNK - 1, latest);
-      try {
-        const logs: Log[] = await rpc.getLogs({
-          address: CONTRACTS.factory,
-          fromBlock,
-          toBlock,
-          topics: [
-            [
-              factoryInterface.getEvent("Pool")!.topicHash,
-              factoryInterface.getEvent("CustomPool")!.topicHash,
-            ],
-          ],
-        });
+      const logs = await getLogsSegment(fromBlock, toBlock);
 
-        for (const log of logs) {
-          try {
-            const parsed = factoryInterface.parseLog({
-              topics: [...log.topics],
-              data: log.data,
-            });
-            if (parsed?.args?.pool) {
-              poolAddresses.add(getAddress(String(parsed.args.pool)));
-            }
-          } catch {
-            // Ignore malformed logs and continue with the next chunk.
+      for (const log of logs) {
+        try {
+          const parsed = factoryInterface.parseLog({
+            topics: [...log.topics],
+            data: log.data,
+          });
+          if (parsed?.args?.pool) {
+            poolAddresses.add(getAddress(String(parsed.args.pool)));
           }
+        } catch (error) {
+          hadRpcError = true;
+          console.warn("[pools] malformed factory log", error);
         }
-      } catch (error) {
-        console.warn(
-          `Factory logs failed ${fromBlock}-${toBlock}; continuing`,
-          error,
-        );
       }
     }
 
-    const pools = await inBatches(Array.from(poolAddresses), 10, async (poolAddress) => {
-      try {
-        const pool = new Contract(poolAddress, poolAbi, rpc);
-        const [token0, token1, fee, tickSpacing] = await Promise.all([
-          pool.token0(),
-          pool.token1(),
-          pool.fee(),
-          pool.tickSpacing(),
-        ]);
+    const pools = await inBatches(
+      Array.from(poolAddresses),
+      10,
+      async (poolAddress) => {
+        try {
+          const pool = new Contract(poolAddress, poolAbi, getProvider());
+          const [token0, token1, fee, tickSpacing] = await Promise.all([
+            pool.token0(),
+            pool.token1(),
+            pool.fee(),
+            pool.tickSpacing(),
+          ]);
 
-        return {
-          poolAddress,
-          token0: getAddress(token0),
-          token1: getAddress(token1),
-          fee: Number(fee),
-          tickSpacing: Number(tickSpacing),
-        };
-      } catch {
-        return null;
-      }
-    });
+          return {
+            poolAddress,
+            token0: getAddress(token0),
+            token1: getAddress(token1),
+            fee: Number(fee),
+            tickSpacing: Number(tickSpacing),
+          };
+        } catch (error) {
+          hadRpcError = true;
+          console.warn(`[pools] pool ${poolAddress} read failed`, error);
+          return null;
+        }
+      },
+    );
 
     const validPools = pools.filter(
       (pool): pool is NonNullable<typeof pool> => pool !== null,
@@ -210,7 +271,7 @@ export async function getAllPools(forceRefresh = false): Promise<PoolInfo[]> {
 
     const metadata = new Map(
       await inBatches(tokenAddresses, 10, async (address) => {
-        const info = await tokenMetadata(address, rpc);
+        const info = await tokenMetadata(address, getProvider());
         return [address, info] as const;
       }),
     );
@@ -233,17 +294,22 @@ export async function getAllPools(forceRefresh = false): Promise<PoolInfo[]> {
       })
       .sort((a, b) => a.name.localeCompare(b.name));
 
+    // Never cache an empty or partially broken result.
+    if (result.length === 0 || hadRpcError) {
+      return result;
+    }
+
     writeCache(result);
     return result;
   } catch (error) {
-    console.error("getAllPools failed", error);
+    hadRpcError = true;
+    console.error("[pools] getAllPools failed", error);
     const cached = readCache();
-    if (cached) return cached;
-    return [];
+    return cached ?? [];
   }
 }
 
 export function poolFeeLabel(fee: number): string {
   if (!Number.isFinite(fee) || fee <= 0) return "fee —";
-  return `${(fee / 10_000).toFixed(2)}% fee`;
+  return `${(fee / 10_000).toFixed(4).replace(/0+$/, "").replace(/\.$/, "")}% fee`;
 }
