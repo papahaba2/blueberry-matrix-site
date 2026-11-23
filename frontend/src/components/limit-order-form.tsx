@@ -70,6 +70,7 @@ export default function LimitOrderForm({
   const [success, setSuccess] = useState("");
   const [approveHash, setApproveHash] = useState<Hash>();
   const [createHash, setCreateHash] = useState<Hash>();
+  const [poolRefresh, setPoolRefresh] = useState(0);
 
   const token0 = useMemo<TokenLeg | null>(
     () =>
@@ -105,6 +106,24 @@ export default function LimitOrderForm({
     stateRead.data && typeof stateRead.data[1] === "number"
       ? stateRead.data[1]
       : undefined;
+  const tickReadError =
+    stateRead.error instanceof Error
+      ? stateRead.error.message
+      : stateRead.error
+        ? String(stateRead.error)
+        : "";
+
+  useEffect(() => {
+    if (!pool) return;
+    console.log(
+      "[pool]",
+      pool.poolAddress,
+      currentTick,
+      pool.fee,
+      pool.tickSpacing,
+      tickReadError,
+    );
+  }, [currentTick, pool, tickReadError]);
 
   const currentPrice = useMemo(() => {
     if (!pool || currentTick === undefined) return null;
@@ -230,6 +249,9 @@ export default function LimitOrderForm({
     if (stateRead.isLoading) {
       return "Загружаем текущую цену пула...";
     }
+    if (stateRead.error) {
+      return `Не удалось прочитать пул ${pool.poolAddress}: ${tickReadError}`;
+    }
     if (currentTick === undefined) {
       return "Не удалось прочитать currentTick пула.";
     }
@@ -269,6 +291,7 @@ export default function LimitOrderForm({
     spacingValid,
     stateRead.isLoading,
     tickSpacing,
+    tickReadError,
     ticksValid,
     token0,
     token1,
@@ -311,7 +334,12 @@ export default function LimitOrderForm({
   };
 
   const busy = isPending || approveReceipt.isLoading || createReceipt.isLoading;
-  const submitDisabled = Boolean(validationError) || busy;
+  // Explicitly tied to the selected pool + successfully decoded current tick.
+  const submitDisabled =
+    !pool ||
+    currentTick === undefined ||
+    Boolean(validationError) ||
+    busy;
   const hint =
     rangeState === "above"
       ? `Для этого диапазона вы должны внести ${token0?.symbol}`
@@ -323,8 +351,18 @@ export default function LimitOrderForm({
     <div className="glass rounded-2xl p-4 md:p-6">
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="label">Pool</label>
+          <div className="mb-2 flex items-center justify-between">
+            <label className="label mb-0">Pool</label>
+            <button
+              type="button"
+              className="font-mono text-[8px] uppercase tracking-[0.12em] text-muted hover:text-white"
+              onClick={() => setPoolRefresh((value) => value + 1)}
+            >
+              Refresh pools
+            </button>
+          </div>
           <PairSearch
+            refreshToken={poolRefresh}
             onSelect={(selected) => {
               setPool(selected);
               setTickLower("");
@@ -339,13 +377,27 @@ export default function LimitOrderForm({
         <div>
           <label className="label">Current tick / price</label>
           <div className="field flex items-center justify-between gap-3 text-muted">
-            <span>{stateRead.isLoading ? "…" : (currentTick ?? "—")}</span>
+            <span>
+              {!pool
+                ? "—"
+                : stateRead.isLoading
+                  ? "loading…"
+                  : stateRead.error
+                    ? "error"
+                    : (currentTick ?? "—")}
+            </span>
             <span className="truncate font-mono text-[10px] text-brand-soft">
-              {currentPrice !== null && pool
-                ? `1 ${pool.symbol0} = ${currentPrice.toLocaleString("en-US", {
-                    maximumSignificantDigits: 6,
-                  })} ${pool.symbol1}`
-                : "select pool"}
+              {!pool
+                ? "select pool"
+                : stateRead.isLoading
+                  ? "loading"
+                  : stateRead.error
+                    ? "read failed"
+                    : currentPrice !== null
+                      ? `1 ${pool.symbol0} = ${currentPrice.toLocaleString("en-US", {
+                          maximumSignificantDigits: 6,
+                        })} ${pool.symbol1}`
+                      : "—"}
             </span>
           </div>
           {pool && (
@@ -379,6 +431,13 @@ export default function LimitOrderForm({
           />
         </div>
       </div>
+
+      {pool && (stateRead.error || (currentTick === undefined && !stateRead.isLoading)) && (
+        <p className="mt-4 rounded-xl border border-red-400/20 bg-red-400/[0.06] px-3 py-2 text-[11px] leading-5 text-red-200">
+          Не удалось прочитать пул {pool.poolAddress}:{" "}
+          {tickReadError || "currentTick unavailable"}
+        </p>
+      )}
 
       {pool?.poolAddress === ZERO_ADDRESS && (
         <p className="mt-4 rounded-xl border border-amber-400/25 bg-amber-400/[0.07] px-3 py-2 text-[11px] leading-5 text-amber-200">
@@ -465,7 +524,7 @@ export default function LimitOrderForm({
             type="button"
             className="btn-primary w-full"
             onClick={approve}
-            disabled={busy || Boolean(validationError)}
+            disabled={submitDisabled}
           >
             {approveReceipt.isLoading
               ? "Approving..."
