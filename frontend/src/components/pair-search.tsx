@@ -3,8 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getAllPools,
+  getPoolProgress,
+  getPoolSnapshot,
   poolFeeLabel,
+  stopPoolScan,
   type PoolInfo,
+  type PoolProgress,
 } from "@/utils/getAllPools";
 
 function addressColor(address: string): string {
@@ -17,6 +21,11 @@ function shortAddress(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
+function formatMillion(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "0";
+  return `${(value / 1_000_000).toFixed(1)}M`;
+}
+
 export default function PairSearch({
   onSelect,
   refreshToken = 0,
@@ -24,13 +33,14 @@ export default function PairSearch({
   onSelect: (pool: PoolInfo) => void;
   refreshToken?: number;
 }) {
-  const [pools, setPools] = useState<PoolInfo[]>([]);
+  const [pools, setPools] = useState<PoolInfo[]>(() => getPoolSnapshot());
   const [query, setQuery] = useState("");
   const [selectedAddress, setSelectedAddress] = useState("");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
+  const [progress, setProgress] = useState<PoolProgress>(() => getPoolProgress());
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const load = async (forceRefresh = false) => {
@@ -41,15 +51,36 @@ export default function PairSearch({
       const result = await getAllPools(forceRefresh);
       setPools(result);
       setLoaded(true);
+      const nextProgress = getPoolProgress();
+      setProgress(nextProgress);
+      setLoading(nextProgress.running);
       if (result.length === 0) {
         setError("Не удалось загрузить пулы. Проверь RPC или повтори позже.");
       }
     } catch {
-      setError("Не удалось загрузить пулы.");
-    } finally {
       setLoading(false);
+      setError("Не удалось загрузить пулы.");
     }
   };
+
+  useEffect(() => {
+    if (!open && !loading) return;
+    const interval = window.setInterval(() => {
+      const snapshot = getPoolSnapshot();
+      if (snapshot.length > 0) setPools(snapshot);
+      const next = getPoolProgress();
+      setProgress(next);
+      if (!next.running) setLoading(false);
+      if (next.error) {
+        setError(
+          next.error === "scan-limit"
+            ? "Скан остановлен по таймауту/лимиту запросов. Продолжи с курсора."
+            : `Ошибка RPC: ${next.error}`,
+        );
+      }
+    }, 500);
+    return () => window.clearInterval(interval);
+  }, [loading, open]);
 
   useEffect(() => {
     if (refreshToken > 0) {
@@ -133,12 +164,53 @@ export default function PairSearch({
       {open && (
         <div className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-white/[0.1] bg-[#0d0a12] p-1 shadow-2xl">
           {loading && (
-            <p className="px-3 py-4 text-[11px] text-muted">
-              Indexing pools from Factory events… this can take a moment.
-            </p>
+            <div className="px-3 py-3">
+              <p className="text-[11px] text-muted">
+                {formatMillion(progress.scanned)} / {formatMillion(progress.total)} блоков
+                {" · "}найдено {progress.found} пулов
+              </p>
+              <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[0.06]">
+                <div
+                  className="h-full rounded-full bg-brand transition-[width]"
+                  style={{
+                    width: `${
+                      progress.total > 0
+                        ? Math.min(100, (progress.scanned / progress.total) * 100)
+                        : 5
+                    }%`,
+                  }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => stopPoolScan()}
+                className="mt-2 font-mono text-[8px] uppercase tracking-[0.12em] text-red-200 hover:text-white"
+              >
+                Stop scan
+              </button>
+            </div>
           )}
 
-          {!loading && error && (
+          {!loading && progress.error && (
+            <div className="flex items-center justify-between gap-2 px-3 py-3">
+              <p className="text-[10px] text-amber-200">
+                Скан остановлен. Продолжить с блока{" "}
+                {progress.scanned > 0
+                  ? formatMillion(progress.scanned)
+                  : "начала"}
+                .
+              </p>
+              <button
+                type="button"
+                onClick={() => void load(false)}
+                className="shrink-0 font-mono text-[8px] uppercase tracking-[0.1em] text-brand-soft hover:text-white"
+              >
+                Continue
+              </button>
+            </div>
+          )}
+
+          {!loading && error && !progress.error && (
             <p className="px-3 py-4 text-[11px] text-red-200">{error}</p>
           )}
 
@@ -148,8 +220,7 @@ export default function PairSearch({
             </p>
           )}
 
-          {!loading &&
-            filtered.map((pool) => (
+          {filtered.map((pool) => (
               <button
                 key={pool.poolAddress}
                 type="button"
