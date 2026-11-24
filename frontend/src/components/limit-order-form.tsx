@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Address, Hash } from "viem";
-import { formatUnits, maxUint256, parseUnits } from "viem";
+import { formatUnits, parseUnits } from "viem";
 import {
   useAccount,
   useReadContract,
@@ -220,7 +220,13 @@ export default function LimitOrderForm({
 
   const balance = balanceRead.data ?? 0n;
   const allowance = allowanceRead.data ?? 0n;
-  const needsApproval = amountIn !== null && allowance < amountIn;
+
+  // Approve a small buffer instead of exact amount or unlimited allowance.
+  // 0.1% plus 1 wei protects against rounding / internal adjustments.
+  const approveAmount =
+    amountIn === null ? null : amountIn + amountIn / 1000n + 1n;
+  const needsApproval =
+    approveAmount !== null && allowance < approveAmount;
 
   const expectedOut = useMemo(() => {
     if (!amountIn || !tokenIn || !tokenOut) return null;
@@ -427,7 +433,7 @@ export default function LimitOrderForm({
   ]);
 
   const approve = async () => {
-    if (!tokenIn || !amountIn) return;
+    if (!tokenIn || !approveAmount) return;
     setError("");
     setSuccess("");
     try {
@@ -435,7 +441,7 @@ export default function LimitOrderForm({
         address: tokenIn.address,
         abi: ERC20_ABI,
         functionName: "approve",
-        args: [CONTRACTS.limitOrderManager, maxUint256],
+        args: [CONTRACTS.limitOrderManager, approveAmount],
       });
       setApproveHash(hash);
     } catch (err) {
@@ -720,7 +726,9 @@ export default function LimitOrderForm({
             </span>
             <span>
               Allowance: {formatUnits(allowance, tokenIn.decimals)}
-              {amountIn ? ` / ${formatUnits(amountIn, tokenIn.decimals)}` : ""}
+              {approveAmount
+                ? ` / ${formatUnits(approveAmount, tokenIn.decimals)} required`
+                : ""}
             </span>
           </div>
         )}
@@ -748,7 +756,7 @@ export default function LimitOrderForm({
           >
             {approveReceipt.isLoading
               ? "Approving..."
-              : `Approve Max ${tokenIn?.symbol ?? ""}`}
+              : `Approve ${tokenIn?.symbol ?? ""}`}
           </button>
         ) : (
           <button
