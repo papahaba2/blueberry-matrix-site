@@ -283,6 +283,16 @@
         "type": "address"
       },
       {
+        "internalType": "uint24",
+        "name": "fee",
+        "type": "uint24"
+      },
+      {
+        "internalType": "int24",
+        "name": "tickSpacing",
+        "type": "int24"
+      },
+      {
         "internalType": "uint256",
         "name": "amountIn",
         "type": "uint256"
