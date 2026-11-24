@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Address, Hash } from "viem";
-import { formatUnits, parseUnits } from "viem";
+import { formatUnits, maxUint256, parseUnits } from "viem";
 import {
   useAccount,
   useReadContract,
@@ -118,13 +118,17 @@ export default function LimitOrderForm({
     address: (pool?.poolAddress as Address | undefined) ?? undefined,
     abi: POOL_ABI,
     functionName: "globalState",
-    query: { enabled: Boolean(pool) },
+    query: { enabled: Boolean(pool), refetchInterval: 12_000 },
   });
 
   const currentTick =
     stateRead.data && typeof stateRead.data[1] === "number"
       ? stateRead.data[1]
       : undefined;
+  const liveFee =
+    stateRead.data && typeof stateRead.data[2] === "number"
+      ? stateRead.data[2]
+      : pool?.fee;
   const tickReadError =
     stateRead.error instanceof Error
       ? stateRead.error.message
@@ -431,7 +435,7 @@ export default function LimitOrderForm({
         address: tokenIn.address,
         abi: ERC20_ABI,
         functionName: "approve",
-        args: [CONTRACTS.limitOrderManager, amountIn],
+        args: [CONTRACTS.limitOrderManager, maxUint256],
       });
       setApproveHash(hash);
     } catch (err) {
@@ -440,7 +444,8 @@ export default function LimitOrderForm({
   };
 
   const createOrder = async () => {
-    if (!tokenIn || !tokenOut || !amountIn || !ticksValid) return;
+    if (!tokenIn || !tokenOut || !amountIn || !ticksValid || !pool) return;
+    if (typeof liveFee !== "number") return;
     setError("");
     setSuccess("");
     try {
@@ -448,7 +453,15 @@ export default function LimitOrderForm({
         address: CONTRACTS.limitOrderManager,
         abi: LIMIT_ORDER_MANAGER_ABI,
         functionName: "createOrder",
-        args: [tokenIn.address, tokenOut.address, amountIn, lower, upper],
+        args: [
+          tokenIn.address,
+          tokenOut.address,
+          liveFee,
+          pool.tickSpacing,
+          amountIn,
+          lower,
+          upper,
+        ],
       });
       setCreateHash(hash);
     } catch (err) {
@@ -458,7 +471,11 @@ export default function LimitOrderForm({
 
   const busy = isPending || approveReceipt.isLoading || createReceipt.isLoading;
   const submitDisabled =
-    !pool || currentTick === undefined || Boolean(validationError) || busy;
+    !pool ||
+    currentTick === undefined ||
+    typeof liveFee !== "number" ||
+    Boolean(validationError) ||
+    busy;
   const hint =
     rangeState === "above"
       ? `Выше текущей цены → депозит ${token0?.symbol}`
@@ -529,7 +546,7 @@ export default function LimitOrderForm({
           </div>
           {pool && (
             <p className="mt-2 font-mono text-[9px] text-faint">
-              fee {poolFeeLabel(pool.fee)} · tickSpacing {pool.tickSpacing}
+              fee {liveFee ? poolFeeLabel(liveFee) : "—"} · tickSpacing {pool.tickSpacing}
             </p>
           )}
         </div>
@@ -697,9 +714,15 @@ export default function LimitOrderForm({
           </span>
         </div>
         {tokenIn && (
-          <p className="mt-2 font-mono text-[9px] text-faint">
-            Balance: {formatUnits(balance, tokenIn.decimals)} {tokenIn.symbol}
-          </p>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 font-mono text-[9px] text-faint">
+            <span>
+              Balance: {formatUnits(balance, tokenIn.decimals)} {tokenIn.symbol}
+            </span>
+            <span>
+              Allowance: {formatUnits(allowance, tokenIn.decimals)}
+              {amountIn ? ` / ${formatUnits(amountIn, tokenIn.decimals)}` : ""}
+            </span>
+          </div>
         )}
       </div>
 
@@ -725,7 +748,7 @@ export default function LimitOrderForm({
           >
             {approveReceipt.isLoading
               ? "Approving..."
-              : `Approve ${tokenIn?.symbol ?? ""}`}
+              : `Approve Max ${tokenIn?.symbol ?? ""}`}
           </button>
         ) : (
           <button
