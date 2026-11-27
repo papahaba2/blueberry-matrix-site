@@ -1,0 +1,571 @@
+import type { Abi, Address } from "viem";
+import ManagerAbi from "@/abi/V4LimitOrderManager.json";
+
+export const APP_NAME = "Blueberry Matrix";
+export const FUSE_CHAIN_ID = 122;
+export const EXPLORER_URL = "https://explorer.fuse.io";
+export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
+
+/**
+ * Deployed Fuse V4 contracts.
+ * The manager address is injected at build time so the same source can target
+ * a fresh deployment without editing code.
+ */
+export const LIMIT_ORDER_MANAGER_ADDRESS = (
+  process.env.NEXT_PUBLIC_LIMIT_ORDER_MANAGER_ADDRESS ||
+  "0xBD001eA4c71435b357AC67B52D4ffc6A05b2D529"
+).trim() as Address;
+
+export const STAKING_ADDRESS = (
+  process.env.NEXT_PUBLIC_STAKING_ADDRESS ||
+  "0x8042db355A0b70aaBAFcF08852152B3A570c822E"
+).trim() as Address;
+
+export const BBWFUSE_ADDRESS = (
+  process.env.NEXT_PUBLIC_BBWFUSE_ADDRESS ||
+  "0xf1227c2419f3535d918B0174b7Df5AbC602d718e"
+).trim() as Address;
+
+export const BERRY_ADDRESS = (
+  process.env.NEXT_PUBLIC_BERRY_ADDRESS ||
+  "0x5dc3fc8b4c0fcb33f7af13f14920172fef288069"
+).trim() as Address;
+
+export const WFUSE_ADDRESS = (
+  process.env.NEXT_PUBLIC_WFUSE_ADDRESS ||
+  "0x0BE9e53fd7EDaC9F859882AfdDa116645287C629"
+).trim() as Address;
+
+export const VOLT_ADDRESS = (
+  process.env.NEXT_PUBLIC_VOLT_ADDRESS ||
+  "0x34Ef2Cc892a88415e9f02b91BfA9c91fC0bE6bD4"
+).trim() as Address;
+
+export const STAKING_OWNER_ADDRESS = (
+  process.env.NEXT_PUBLIC_STAKING_OWNER ||
+  "0x30B9a303D785B01Ba9F3bAf6f15affab15A3833e"
+).trim() as Address;
+
+export const SWAP_ROUTER_ADDRESS = (
+  process.env.NEXT_PUBLIC_SWAP_ROUTER ||
+  "0x6E055FfA786Dfe9DBB214b649a9b2A169e6B820b"
+).trim() as Address;
+
+/**
+ * Deployed Fuse V4 contracts.
+ * The manager falls back to the live deployment when the build variable is
+ * absent, so the UI never shows a false "not configured" error.
+ */
+export const CONTRACTS = {
+  factory: "0xccEdb990abBf0606Cf47e7C6A26e419931c7dc1F" as Address,
+  positionManager: "0x52B649B1cE77B349C53Bf0284ba61FD8975e7798" as Address,
+  limitOrderManager: LIMIT_ORDER_MANAGER_ADDRESS,
+} as const;
+
+/** First block where the manager was deployed. Use 0 to disable event scans. */
+export const MANAGER_DEPLOY_BLOCK = Number(
+  process.env.NEXT_PUBLIC_LIMIT_ORDER_MANAGER_DEPLOY_BLOCK || "0",
+);
+
+export type Token = {
+  symbol: string;
+  name: string;
+  address: Address;
+  decimals: number;
+  priceUsd?: number;
+};
+
+export const TOKENS = {
+  WFUSE: {
+    symbol: "WFUSE",
+    name: "Wrapped Fuse",
+    address: "0x0BE9e53fd7EDaC9F859882AfdDa116645287C629",
+    decimals: 18,
+    priceUsd: Number(process.env.NEXT_PUBLIC_WFUSE_USD_PRICE || "0.05"),
+  },
+  USDC: {
+    symbol: "USDC",
+    name: "USD Coin",
+    address: "0x620fd5fa44BE6af63715Ef4E65DDFA0387aD13F5",
+    decimals: 6,
+    priceUsd: 1,
+  },
+  VOLT: {
+    symbol: "VOLT",
+    name: "Voltage",
+    address: "0x34Ef2Cc892a88415e9f02b91BfA9c91fC0bE6bD4",
+    decimals: 18,
+    priceUsd: Number(process.env.NEXT_PUBLIC_VOLT_USD_PRICE || "0"),
+  },
+} as const satisfies Record<string, Token>;
+
+export const COINGECKO_IDS: Record<string, string> = {
+  // WFUSE is wrapped FUSE; CoinGecko prices the native token under this id.
+  WFUSE:
+    process.env.NEXT_PUBLIC_COINGECKO_IDS_WFUSE || "fuse-network-token",
+  USDC: process.env.NEXT_PUBLIC_COINGECKO_IDS_USDC || "usd-coin",
+};
+
+export type SeedPool = {
+  token0: Address;
+  token1: Address;
+  symbol0: string;
+  symbol1: string;
+  decimals0: number;
+  decimals1: number;
+  fee: number;
+  poolAddress?: Address;
+  tickSpacing?: number;
+};
+
+/**
+ * Fast-start pairs with verified Fuse token addresses.
+ * Unknown-token pairs from the screenshot are intentionally omitted rather
+ * than inventing addresses; the Factory scan discovers them.
+ */
+export const SEED_POOLS: SeedPool[] = [
+  {
+    token0: "0x0BE9e53fd7EDaC9F859882AfdDa116645287C629",
+    token1: "0xFaDbBF8Ce7D5b7041bE672561bbA99f79c532e10",
+    symbol0: "WFUSE",
+    symbol1: "USDT",
+    decimals0: 18,
+    decimals1: 6,
+    fee: 8048,
+  },
+  {
+    token0: "0xFaDbBF8Ce7D5b7041bE672561bbA99f79c532e10",
+    token1: "0x620fd5fa44BE6af63715Ef4E65DDFA0387aD13F5",
+    symbol0: "USDT",
+    symbol1: "USDC",
+    decimals0: 6,
+    decimals1: 6,
+    fee: 100,
+  },
+  {
+    token0: "0x0BE9e53fd7EDaC9F859882AfdDa116645287C629",
+    token1: "0x34Ef2Cc892a88415e9f02b91BfA9c91fC0bE6bD4",
+    symbol0: "WFUSE",
+    symbol1: "VOLT",
+    decimals0: 18,
+    decimals1: 18,
+    fee: 279,
+    poolAddress: "0x57827c76d7749961EF41e7918dd9f8CfDfc7d28D",
+    tickSpacing: 60,
+  },
+  {
+    token0: "0xa722c13135930332Eb3d749B2F0906559D2C5b99",
+    token1: "0xFaDbBF8Ce7D5b7041bE672561bbA99f79c532e10",
+    symbol0: "WETH",
+    symbol1: "USDT",
+    decimals0: 18,
+    decimals1: 6,
+    fee: 3048,
+  },
+  {
+    token0: "0x94Ba7A27c7A95863d1bdC7645AC2951E0cca06bA",
+    token1: "0xFaDbBF8Ce7D5b7041bE672561bbA99f79c532e10",
+    symbol0: "DAI",
+    symbol1: "USDT",
+    decimals0: 18,
+    decimals1: 6,
+    fee: 100,
+  },
+  {
+    token0: "0xa722c13135930332Eb3d749B2F0906559D2C5b99",
+    token1: "0x33284f95ccb7B948d9D352e1439561CF83d8d00d",
+    symbol0: "WETH",
+    symbol1: "WBTC",
+    decimals0: 18,
+    decimals1: 8,
+    fee: 100,
+  },
+];
+
+export type VaultConfig = {
+  id: string;
+  name: string;
+  shareSymbol: string;
+  address: Address;
+  asset: Token;
+  aprBps: number;
+  priceUsd: number;
+  /** Optional hardcoded USD price for the vault asset. */
+};
+
+const WFUSE_VAULT_ADDRESS = (process.env.NEXT_PUBLIC_WFUSE_VAULT_ADDRESS ||
+  "0xf1227c2419f3535d918B0174b7Df5AbC602d718e") as Address;
+const USDC_VAULT_ADDRESS = (process.env.NEXT_PUBLIC_USDC_VAULT_ADDRESS ||
+  "0x53968BA736439d7838E88e0F7BCb47A4d9C6955a") as Address;
+
+export const VAULTS: VaultConfig[] = [
+  {
+    id: "wfuse",
+    name: "WFUSE Vault",
+    shareSymbol: "bbWFUSE",
+    address: WFUSE_VAULT_ADDRESS,
+    asset: TOKENS.WFUSE,
+    aprBps: Number(process.env.NEXT_PUBLIC_WFUSE_VAULT_APR_BPS || "20010"),
+    priceUsd: TOKENS.WFUSE.priceUsd ?? 0,
+  },
+  {
+    id: "usdc",
+    name: "USDC Vault",
+    shareSymbol: "bbUSDC",
+    address: USDC_VAULT_ADDRESS,
+    asset: TOKENS.USDC,
+    aprBps: Number(process.env.NEXT_PUBLIC_USDC_VAULT_APR_BPS || "0"),
+    priceUsd: 1,
+  },
+];
+
+export type Pair = {
+  id: string;
+  label: string;
+  a: Token;
+  b: Token;
+};
+
+export const PAIRS: Pair[] = [
+  {
+    id: "WFUSE-USDC",
+    label: "WFUSE / USDC",
+    a: TOKENS.WFUSE,
+    b: TOKENS.USDC,
+  },
+  {
+    id: "WFUSE-VOLT",
+    label: "WFUSE / VOLT",
+    a: TOKENS.WFUSE,
+    b: TOKENS.VOLT,
+  },
+];
+
+/** Algebra addresses are sorted by numeric address, not by UI order. */
+export function sortTokens(a: Token, b: Token): [Token, Token] {
+  return BigInt(a.address) < BigInt(b.address) ? [a, b] : [b, a];
+}
+
+export function tokenByAddress(address: Address): Token | undefined {
+  return Object.values(TOKENS).find(
+    (token) => token.address.toLowerCase() === address.toLowerCase(),
+  );
+}
+
+export function explorerAddress(address: string): string {
+  return `${EXPLORER_URL}/address/${address}`;
+}
+
+export function explorerToken(address: string): string {
+  return `${EXPLORER_URL}/token/${address}`;
+}
+
+export const FACTORY_ABI = [
+  {
+    inputs: [
+      { internalType: "address", name: "tokenA", type: "address" },
+      { internalType: "address", name: "tokenB", type: "address" },
+    ],
+    name: "poolByPair",
+    outputs: [{ internalType: "address", name: "pool", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
+export const POOL_ABI = [
+  {
+    inputs: [],
+    name: "globalState",
+    outputs: [
+      { internalType: "uint160", name: "price", type: "uint160" },
+      { internalType: "int24", name: "tick", type: "int24" },
+      { internalType: "uint16", name: "lastFee", type: "uint16" },
+      { internalType: "uint8", name: "pluginConfig", type: "uint8" },
+      { internalType: "uint16", name: "communityFee", type: "uint16" },
+      { internalType: "bool", name: "unlocked", type: "bool" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "fee",
+    outputs: [{ internalType: "uint16", name: "currentFee", type: "uint16" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "tickSpacing",
+    outputs: [{ internalType: "int24", name: "", type: "int24" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
+export const ALGEBRA_POOL_ABI = POOL_ABI;
+
+export const ERC20_ABI = [
+  {
+    inputs: [{ internalType: "address", name: "account", type: "address" }],
+    name: "balanceOf",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "owner", type: "address" },
+      { internalType: "address", name: "spender", type: "address" },
+    ],
+    name: "allowance",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "spender", type: "address" },
+      { internalType: "uint256", name: "amount", type: "uint256" },
+    ],
+    name: "approve",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "decimals",
+    outputs: [{ internalType: "uint8", name: "", type: "uint8" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
+export const LIMIT_ORDER_MANAGER_ABI = ManagerAbi as Abi;
+
+export const STAKING_ABI = [
+  {
+    inputs: [],
+    name: "totalStaked",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "user", type: "address" }],
+    name: "stakedBalance",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "user", type: "address" }],
+    name: "pendingRewards",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "rewardRatePerDay",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "maxSwapPerDay",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "swappedThisDay",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "amount", type: "uint256" }],
+    name: "deposit",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "amount", type: "uint256" }],
+    name: "withdraw",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "claimRewards",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "emergencyWithdraw",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "owner",
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "berryPerDay", type: "uint256" }],
+    name: "setRewardRate",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "amount", type: "uint256" }],
+    name: "topUpRewards",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+export const SWAP_ROUTER_ABI = [
+  {
+    inputs: [
+      {
+        components: [
+          { name: "path", type: "bytes" },
+          { name: "recipient", type: "address" },
+          { name: "deadline", type: "uint256" },
+          { name: "amountIn", type: "uint256" },
+          { name: "amountOutMinimum", type: "uint256" },
+        ],
+        name: "params",
+        type: "tuple",
+      },
+    ],
+    name: "exactInput",
+    outputs: [{ name: "amountOut", type: "uint256" }],
+    stateMutability: "payable",
+    type: "function",
+  },
+] as const;
+
+export function isStakingConfigured(): boolean {
+  return STAKING_ADDRESS !== ZERO_ADDRESS;
+}
+
+export const VAULT_ABI = [
+  {
+    inputs: [],
+    name: "asset",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalAssets",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalSupply",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "shares", type: "uint256" }],
+    name: "convertToAssets",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint256", name: "assets", type: "uint256" }],
+    name: "convertToShares",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint256", name: "assets", type: "uint256" },
+      { internalType: "address", name: "receiver", type: "address" },
+    ],
+    name: "deposit",
+    outputs: [{ internalType: "uint256", name: "shares", type: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint256", name: "shares", type: "uint256" },
+      { internalType: "address", name: "receiver", type: "address" },
+      { internalType: "address", name: "owner", type: "address" },
+    ],
+    name: "redeem",
+    outputs: [{ internalType: "uint256", name: "assets", type: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint256", name: "assets", type: "uint256" },
+      { internalType: "address", name: "receiver", type: "address" },
+      { internalType: "address", name: "owner", type: "address" },
+    ],
+    name: "withdraw",
+    outputs: [{ internalType: "uint256", name: "shares", type: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "account", type: "address" }],
+    name: "balanceOf",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "owner", type: "address" },
+      { internalType: "address", name: "spender", type: "address" },
+    ],
+    name: "allowance",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "address", name: "spender", type: "address" },
+      { internalType: "uint256", name: "amount", type: "uint256" },
+    ],
+    name: "approve",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+export function isVaultConfigured(vault: VaultConfig): boolean {
+  return vault.address !== ZERO_ADDRESS;
+}
+
+export function isManagerConfigured(): boolean {
+  return CONTRACTS.limitOrderManager !== ZERO_ADDRESS;
+}
